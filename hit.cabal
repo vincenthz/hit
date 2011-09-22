@@ -1,0 +1,97 @@
+Name:                hit
+Version:             0.1.0
+Synopsis:            Git operations
+Description:         Provides low level git operations
+License:             BSD3
+License-file:        LICENSE
+Copyright:           Vincent Hanquez <vincent@snarc.org>
+Author:              Vincent Hanquez <vincent@snarc.org>
+Maintainer:          Vincent Hanquez <vincent@snarc.org>
+Category:            Development
+Stability:           experimental
+Build-Type:          Simple
+Homepage:            http://github.com/vincenthz/hit
+Cabal-Version:       >=1.6
+data-files:          README.md
+
+Flag test
+  Description:       Build unit test
+  Default:           False
+
+Flag executable
+  Description:       Build the executable
+  Default:           False
+
+Flag debug
+  Description:       Add some debugging options
+  Default:           False
+
+Library
+  Build-Depends:     base >= 4 && < 5
+                   , mtl
+                   , bytestring
+                   , attoparsec
+                   , parsec     >= 3
+                   , filepath
+                   , directory
+                   , cryptohash
+                   , vector
+                   , random
+                   , zlib
+                   , zlib-bindings >= 0.0.1
+                   , patience
+                   , bytedump
+                   , unix
+  Exposed-modules:   Data.Git.Index
+                     Data.Git.Pack
+                     Data.Git.Object
+                     Data.Git.Loose
+                     Data.Git.Named
+                     Data.Git.Delta
+                     Data.Git.Ref
+                     Data.Git.Revision
+                     Data.Git.Repository
+  Other-modules:     Data.Git.Internal
+                     Data.Git.FileReader
+                     Data.Git.FileWriter
+                     Data.Git.Path
+  ghc-options:       -Wall -fno-warn-missing-signatures
+
+Executable           Hit
+  Main-Is:           Hit.hs
+  ghc-options:       -Wall -fno-warn-missing-signatures
+  if flag(debug)
+    ghc-options:     -rtsops -auto-all -caf-all
+  if flag(executable)
+    Build-depends:   base >= 4 && < 5
+                   , mtl
+                   , containers
+                   , hashable
+                   , hashtables
+                   , bytestring
+                   , attoparsec
+                   , filepath
+                   , directory
+                   , zlib
+                   , bytedump
+    Buildable: True
+  else
+    Buildable: False
+
+Executable           Tests
+  Main-Is:           Tests.hs
+  if flag(test)
+    Buildable:       True
+    Build-depends:   base >= 3 && < 7
+                   , HUnit
+                   , QuickCheck >= 2
+                   , bytestring
+                   , test-framework >= 0.3
+                   , test-framework-quickcheck2 >= 0.2
+  else
+    Buildable:       False
+
+
+source-repository head
+  type: git
+  location: git://github.com/vincenthz/hit

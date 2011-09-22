@@ -1,0 +1,71 @@
+import Test.QuickCheck
+import Test.Framework(defaultMain, testGroup)
+import Test.Framework.Providers.QuickCheck2(testProperty)
+
+import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString as B
+
+import Control.Applicative ((<$>))
+import Control.Monad
+
+import Data.Git.Object
+import Data.Git.Loose
+import Data.Git.Ref
+
+-- for arbitrary instance to generate only data that are writable
+-- to disk. i.e. no deltas.
+data ObjNoDelta = ObjNoDelta Object
+
+instance Show ObjNoDelta where
+	show (ObjNoDelta o) = show o
+
+arbitraryBS size = B.pack . map fromIntegral <$> replicateM size (choose (0,255) :: Gen Int)
+arbitraryBSno0 size = B.pack . map fromIntegral <$> replicateM size (choose (1,255) :: Gen Int)
+
+arbitraryBSascii size = B.pack . map fromIntegral <$> replicateM size (choose (0x20,0x7f) :: Gen Int)
+arbitraryBSnoangle size = B.pack . map fromIntegral <$> replicateM size (choose (0x40,0x7f) :: Gen Int)
+
+instance Arbitrary Ref where
+	arbitrary = fromBinary <$> arbitraryBS 20
+
+arbitraryMsg = arbitraryBSno0 128
+arbitraryLazy = L.fromChunks . (:[]) <$> arbitraryBS 4096
+
+arbitraryRefList :: Gen [Ref]
+arbitraryRefList = replicateM 2 arbitrary
+
+arbitraryEnt = liftM3 (,,) arbitrary (arbitraryBSno0 48) arbitrary
+arbitraryEnts = choose (1,100) >>= \i -> replicateM i arbitraryEnt
+
+arbitraryName = liftM4 (,,,) (arbitraryBSnoangle 16)
+                             (arbitraryBSnoangle 16)
+                             (arbitrary `suchThat` (\i -> i > 0))
+                              arbitrary
+
+arbitraryObjTypeNoDelta = oneof [return TypeTree,return TypeBlob,return TypeCommit,return TypeTag]
+
+instance Arbitrary ObjNoDelta where
+	arbitrary = ObjNoDelta <$> oneof
+		[ liftM5 Commit arbitrary arbitraryRefList arbitraryName arbitraryName arbitraryMsg
+		, liftM Tree arbitraryEnts
+		, liftM Blob arbitraryLazy
+		, liftM5 Tag arbitrary arbitraryObjTypeNoDelta (arbitraryBSascii 20) arbitraryName arbitraryMsg
+		]
+
+prop_object_marshalling_id (ObjNoDelta obj) = obj == (looseUnmarshall $ looseMarshall obj)
+
+refTests =
+	[ testProperty "hexadecimal" (marshEqual (fromHex . toHex))
+	, testProperty "binary" (marshEqual (fromBinary . toBinary))
+	]
+	where
+		marshEqual t ref = ref == t ref
+
+objTests =
+	[ testProperty "unmarshall.marshall==id" prop_object_marshalling_id
+	]
+
+main = defaultMain
+	[ testGroup "ref marshalling" refTests
+	, testGroup "object marshalling" objTests
+	]
