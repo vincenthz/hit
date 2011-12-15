@@ -70,6 +70,8 @@ parseTree   = parseTreeHeader >> objectParseTree
 parseTag    = parseTagHeader >> objectParseTag
 parseCommit = parseCommitHeader >> objectParseCommit
 parseBlob   = parseBlobHeader >> objectParseBlob
+
+parseObject :: L.ByteString -> Object
 parseObject = parseSuccess (parseTree <|> parseBlob <|> parseCommit <|> parseTag)
 	where parseSuccess p = either error id . eitherResult . parse p
 
@@ -118,9 +120,9 @@ looseEnumerateWithPrefix repoPath prefix =
 	looseEnumerateWithPrefixFilter repoPath prefix (const True)
 
 -- | marshall as lazy bytestring an object except deltas.
-looseMarshall (DeltaOfs _ _) = error "cannot write delta offset as single object"
-looseMarshall (DeltaRef _ _) = error "cannot write delta ref as single object"
-looseMarshall obj            = compress $ L.concat [ L.fromChunks [hdrB], objData ]
+looseMarshall obj
+	| objectIsDelta obj = error "cannot write delta object loose"
+	| otherwise         = compress $ L.concat [ L.fromChunks [hdrB], objData ]
 	where
 		objData = objectWrite obj
 		hdrB    = objectWriteHeader (objectToType obj) (fromIntegral $ L.length objData)

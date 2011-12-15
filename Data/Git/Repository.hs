@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 -- |
 -- Module      : Data.Git.Repository
 -- License     : BSD-style
@@ -20,6 +21,8 @@ module Data.Git.Repository
 	, findObjectRaw
 	, findObjectRawAt
 	, findObject
+	, findCommit
+	, findTree
 	, findObjectAt
 	, buildHTree
 	, resolvePath
@@ -246,6 +249,22 @@ findObject git ref resolveDelta = maybe Nothing toObject <$> findObjectRaw git r
 	where
 		toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 
+-- should be a standard function that do that...
+mapJustM f (Just o) = f o
+mapJustM _ Nothing  = return Nothing
+
+findCommit :: Git -> Ref -> IO (Maybe Commit)
+findCommit git ref = findObject git ref True >>= mapJustM unwrap
+	where
+		unwrap (objectToCommit -> Just c@(Commit _ _ _ _ _)) = return $ Just c
+		unwrap _                                             = return Nothing
+
+findTree :: Git -> Ref -> IO (Maybe Tree)
+findTree git ref = findObject git ref True >>= mapJustM unwrap
+	where
+		unwrap (objectToTree -> Just c@(Tree _ )) = return $ Just c
+		unwrap _                                  = return Nothing
+
 -- | try to resolve a string to a specific commit ref
 -- for example: HEAD, HEAD^, master~3, shortRef
 resolveRevision :: Git -> Revision -> IO (Maybe Ref)
@@ -287,32 +306,28 @@ resolveRevision git (Revision prefix modifiers) = resolvePrefix >>= modf modifie
 		modf (_:_) _ = error "unimplemented revision modifier"
 
 		getParentRefs ref = do
-			obj <- findObject git ref True
+			obj <- findCommit git ref
 			case obj of
 				Just (Commit _ parents _ _ _) -> return parents
-				Just _  -> error "wrong object type, expecting commit"
 				Nothing -> error "reference in commit chain doesn't exists"
 
 -- | returns a tree from a ref that might be either a commit, a tree or a tag.
-resolveTreeish :: Git -> Ref -> IO (Maybe Object)
-resolveTreeish git ref = do
-	obj <- findObject git ref True
-	case obj of
-		Just (Commit tree _ _ _ _) -> resolveTreeish git tree
-		Just (Tree _)              -> return obj
-		Just (Tag tref _ _ _ _)    -> resolveTreeish git tref 
-		Just _                     -> return Nothing
-		Nothing                    -> return Nothing
+resolveTreeish :: Git -> Ref -> IO (Maybe Tree)
+resolveTreeish git ref = findObject git ref True >>= mapJustM recToTree where
+	recToTree (objectToCommit -> Just (Commit tree _ _ _ _)) = resolveTreeish git tree
+	recToTree (objectToTag    -> Just (Tag tref _ _ _ _))    = resolveTreeish git tref
+	recToTree (objectToTree   -> Just t@(Tree _))            = return $ Just t
+	recToTree _                                              = return Nothing
 
 -- | build a hierarchy tree from a tree object
-buildHTree :: Git -> Object -> IO HTree
+buildHTree :: Git -> Tree -> IO HTree
 buildHTree git (Tree ents) = mapM resolveTree ents
 	where resolveTree (perm, ent, ref) = do
 		obj <- findObjectType git ref
 		case obj of
 			Just TypeBlob -> return (perm, ent, TreeFile ref)
 			Just TypeTree -> do
-				ctree <- findObject git ref True
+				ctree <- findTree git ref
 				case ctree of
 					Nothing -> error "unknown reference in tree object: no such child"
 					Just t  -> do
@@ -320,28 +335,25 @@ buildHTree git (Tree ents) = mapM resolveTree ents
 						return (perm, ent, TreeDir ref dir)
 			Just _        -> error "wrong type embedded in tree object"
 			Nothing       -> error "unknown reference in tree object"
-buildHTree _   _           = error "cannot build a tree structure from anything else than a tree"
 
 -- | resolve the ref (tree or blob) related to a path at a specific commit ref
 resolvePath :: Git -> Ref -> [ByteString] -> IO (Maybe Ref)
 resolvePath git commitRef paths = do
-	commit <- findObject git commitRef True
+	commit <- findCommit git commitRef
 	case commit of
 		Just (Commit tree _ _ _ _) -> resolve tree paths
-		Just _                     -> error ("expecting commit object at " ++ show commitRef)
 		Nothing                    -> error ("not a valid ref: " ++ show commitRef)
 	where
 		resolve :: Ref -> [ByteString] -> IO (Maybe Ref)
 		resolve treeRef []     = return $ Just treeRef
 		resolve treeRef (x:xs) = do
-			tree <- findObject git treeRef True
+			tree <- findTree git treeRef
 			case tree of
 				Just (Tree ents) -> do
 					let cEnt = treeEntRef <$> findEnt x ents
 					if xs == []
 						then return cEnt
 						else maybe (return Nothing) (\z -> resolve z xs) cEnt
-				Just _           -> error ("expecting tree object at " ++ show treeRef)
 				Nothing          -> error ("not a valid ref: " ++ show treeRef)
 
 		findEnt x = find (\(_, b, _) -> b == x)

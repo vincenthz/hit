@@ -117,8 +117,8 @@ packObjectFromRaw (TypeCommit, Nothing, objData) = AL.maybeResult $ AL.parse obj
 packObjectFromRaw (TypeTree, Nothing, objData)   = AL.maybeResult $ AL.parse objectParseTree objData
 packObjectFromRaw (TypeBlob, Nothing, objData)   = AL.maybeResult $ AL.parse objectParseBlob objData
 packObjectFromRaw (TypeTag, Nothing, objData)    = AL.maybeResult $ AL.parse objectParseTag objData
-packObjectFromRaw (TypeDeltaOff, Just (PtrOfs o), objData) = DeltaOfs o <$> deltaRead objData
-packObjectFromRaw (TypeDeltaRef, Just (PtrRef r), objData) = DeltaRef r <$> deltaRead objData
+packObjectFromRaw (TypeDeltaOff, Just (PtrOfs o), objData) = objectWrap . DeltaOfs o <$> deltaRead objData
+packObjectFromRaw (TypeDeltaRef, Just (PtrRef r), objData) = objectWrap . DeltaRef r <$> deltaRead objData
 packObjectFromRaw _                              = error "can't happen unless someone change getNextObjectRaw"
 
 getNextObjectRaw :: FileReader -> IO PackedObjectRaw
