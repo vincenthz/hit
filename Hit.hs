@@ -134,7 +134,7 @@ revList revision git = do
 	ref <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
 	loopTillEmpty ref
 	where loopTillEmpty ref = do
-		obj <- findObject git ref True
+		obj <- findCommit git ref
 		case obj of
 			Just (Commit _ parents _ _ _) -> do
 				putStrLn $ show ref
@@ -144,7 +144,6 @@ revList revision git = do
 				case parents of
 					[]    -> return ()
 					(p:_) -> loopTillEmpty p
-			Just _  -> error "wrong object type, expecting commit"
 			Nothing -> error "reference in commit chain doesn't exists"
 
 main = do
