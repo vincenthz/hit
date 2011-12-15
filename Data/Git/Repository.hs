@@ -354,7 +354,7 @@ isRepo path = do
 	subDirs <- mapM (doesDirectoryExist . (path </>))
 		["branches","hooks","info"
 		,"logs","objects","refs"
-		,"refs"</>"heads","refs"</>"remotes","refs"</>"tags"]
+		,"refs"</>"heads","refs"</>"tags"]
 	return $ and ([dir] ++ subDirs)
 
 -- | initialize a new repository at a specific location.
@@ -366,4 +366,4 @@ initRepo path = do
 	mapM_ (createDirectory . (path </>))
 		["branches","hooks","info"
 		,"logs","objects","refs"
-		,"refs"</>"heads","refs"</>"remotes","refs"</>"tags"]
+		,"refs"</>"heads","refs"</>"tags"]
