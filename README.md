@@ -1,5 +1,5 @@
-        Hit
-        ===
+Hit
+===
 
 Hit is a reimplementation of some git operations in pure haskell.
 
