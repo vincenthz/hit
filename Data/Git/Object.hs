@@ -57,7 +57,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.Attoparsec.Lazy
 import qualified Data.Attoparsec.Lazy as P
 import qualified Data.Attoparsec.Char8 as PC
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), many)
 import Control.Monad
 
 import Data.Word

@@ -22,7 +22,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.Bits
 import Data.Word
 
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), many)
 
 -- | a delta is a source size, a destination size and a list of delta cmd
 data Delta = Delta Word64 Word64 [DeltaCmd]

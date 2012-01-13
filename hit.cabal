@@ -30,7 +30,7 @@ Library
   Build-Depends:     base >= 4 && < 5
                    , mtl
                    , bytestring
-                   , attoparsec
+                   , attoparsec >= 0.10.1
                    , parsec     >= 3
                    , filepath
                    , directory
@@ -39,7 +39,6 @@ Library
                    , random
                    , zlib
                    , zlib-bindings >= 0.0.1
-                   , patience
                    , bytedump
                    , unix
   Exposed-modules:   Data.Git.Index
@@ -69,7 +68,7 @@ Executable           Hit
                    , hashable
                    , hashtables
                    , bytestring
-                   , attoparsec
+                   , attoparsec >= 0.10.1
                    , filepath
                    , directory
                    , zlib

@@ -27,7 +27,7 @@ import Control.Applicative ((<$>))
 import Control.Exception (bracket, throwIO)
 import Control.Monad
 
-import Data.Attoparsec (parseWith, Parser, Result(..))
+import Data.Attoparsec (parseWith, Parser, IResult(..))
 import qualified Data.Attoparsec as A
 import Data.Bits
 import Data.ByteString (ByteString)
