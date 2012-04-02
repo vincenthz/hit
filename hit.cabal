@@ -40,7 +40,6 @@ Library
                    , zlib
                    , zlib-bindings >= 0.0.1
                    , bytedump
-                   , unix
   Exposed-modules:   Data.Git.Index
                      Data.Git.Pack
                      Data.Git.Object

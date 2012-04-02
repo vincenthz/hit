@@ -34,7 +34,7 @@ import Data.Git.Object
 
 import System.FilePath
 import System.Directory
-import System.Posix.Files
+import System.IO (openFile, hFileSize, IOMode(..))
 
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as L
@@ -130,8 +130,8 @@ looseMarshall obj
 -- | create a new blob on a temporary location and on success move it to
 -- the object store with its digest name.
 looseWriteBlobFromFile repoPath file = do
-	fsz <- fromIntegral . fileSize <$> getFileStatus file
-	let hdr = objectWriteHeader TypeBlob fsz
+	fsz <- openFile file ReadMode >>= hFileSize
+	let hdr = objectWriteHeader TypeBlob (fromIntegral fsz)
 	tmpPath <- objectTemporaryPath repoPath
 	flip onException (removeFile tmpPath) $ do
 		npath <- withFileWriter tmpPath $ \fw -> do
