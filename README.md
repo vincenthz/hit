@@ -34,7 +34,7 @@ resolving path of the README file and returning the reference to the blob :
     import Data.Git.Repository
 
     showPathRef commitRef = withRepo ".git" $ \git -> do
-	ref <- maybe (error "inexistent object at this path") id `fmap` resolvePath git commitRef ["README"]
+        ref <- maybe (error "inexistent object at this path") id `fmap` resolvePath git commitRef ["README"]
         putStrLn ("README has the reference: " ++ show ref)
 
 
@@ -43,7 +43,7 @@ catting an object from a ref:
     import Data.Git.Repository
 
     catFile ref = withRepo ".git" $ \git -> do
-	obj <- maybe (error "not a valid object") id `fmap` findObjectRaw git ref True
+        obj <- maybe (error "not a valid object") id `fmap` findObjectRaw git ref True
         L.putStrLn (oiData obj)
 
 
