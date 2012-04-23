@@ -42,7 +42,6 @@ postDeflate _      Nothing    = return ()
 postDeflate handle (Just dbs) = B.hPut handle dbs
 
 fileWriterOutput (FileWriter { writerHandle = handle, writerDigest = digest, writerDeflate = deflate }) bs = do
-        putStrLn ("outputing" ++ show bs)
         modifyIORef digest (\ctx -> SHA1.update ctx bs)
         postDeflate handle =<< withDeflateInput deflate bs id
 
