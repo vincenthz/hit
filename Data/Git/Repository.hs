@@ -356,7 +356,7 @@ resolvePath git commitRef paths = do
 
                 findEnt x = find (\(_, b, _) -> b == x)
                 treeEntRef (_,_,r) = r
-        
+
 -- | basic checks to see if a specific path looks like a git repo.
 isRepo :: FilePath -> IO Bool
 isRepo path = do
