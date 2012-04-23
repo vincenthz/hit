@@ -7,19 +7,19 @@
 -- Portability : unix
 --
 module Data.Git.Named
-	( headList
-	, headExists
-	, headRead
-	, headWrite
-	, remotesList
-	, remoteList
-	, tagList
-	, tagExists
-	, tagRead
-	, tagWrite
-	, specialRead
-	, specialExists
-	) where
+        ( headList
+        , headExists
+        , headRead
+        , headWrite
+        , remotesList
+        , remoteList
+        , tagList
+        , tagExists
+        , tagRead
+        , tagWrite
+        , specialRead
+        , specialExists
+        ) where
 
 import Control.Applicative ((<$>))
 
@@ -32,7 +32,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 getDirectoryContentNoDots path = filter noDot <$> getDirectoryContents path
-	where noDot = (not . isPrefixOf ".")
+        where noDot = (not . isPrefixOf ".")
 
 headList gitRepo = getDirectoryContentNoDots (headsPath gitRepo)
 tagList gitRepo = getDirectoryContentNoDots (tagsPath gitRepo)
@@ -43,12 +43,12 @@ writeRef path ref = B.writeFile path (B.concat [toHex ref, B.singleton 0xa])
 readRef path = fromHex . B.take 40 <$> B.readFile path
 
 readRefAndFollow gitRepo path = do
-	content <- B.readFile path
-	if "ref: " `B.isPrefixOf` content
-		then do -- BC.unpack should be utf8.toString, and the whole thing is really fragile. need to do the proper thing.
-			let file = BC.unpack $ BC.init $ B.drop 5 content
-			readRefAndFollow gitRepo (gitRepo ++ "/" ++ file)
-		else return (fromHex $ B.take 40 content)
+        content <- B.readFile path
+        if "ref: " `B.isPrefixOf` content
+                then do -- BC.unpack should be utf8.toString, and the whole thing is really fragile. need to do the proper thing.
+                        let file = BC.unpack $ BC.init $ B.drop 5 content
+                        readRefAndFollow gitRepo (gitRepo ++ "/" ++ file)
+                else return (fromHex $ B.take 40 content)
 
 headExists gitRepo name    = doesFileExist (headPath gitRepo name)
 headRead gitRepo name      = readRef (headPath gitRepo name)

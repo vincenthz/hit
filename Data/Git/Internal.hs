@@ -6,8 +6,8 @@
 -- Portability : unix
 --
 module Data.Git.Internal
-	( be32
-	) where
+        ( be32
+        ) where
 
 import Data.Bits
 import Data.Word

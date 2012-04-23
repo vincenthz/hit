@@ -6,23 +6,23 @@
 -- Portability : unix
 --
 module Data.Git.Pack
-	( PackedObjectInfo(..)
-	, PackedObjectRaw
-	-- * Enumerators of packs
-	, packEnumerate
-	-- * Helpers to process packs
-	, packOpen
-	, packClose
-	-- * Command for the content of a pack
-	, packReadHeader
-	, packReadMapAtOffset
-	, packReadAtOffset
-	, packReadRawAtOffset
-	, packEnumerateObjects
-	-- * turn a packed object into a 
-	, packedObjectToObject
-	, packObjectFromRaw
-	) where
+        ( PackedObjectInfo(..)
+        , PackedObjectRaw
+        -- * Enumerators of packs
+        , packEnumerate
+        -- * Helpers to process packs
+        , packOpen
+        , packClose
+        -- * Command for the content of a pack
+        , packReadHeader
+        , packReadMapAtOffset
+        , packReadAtOffset
+        , packReadRawAtOffset
+        , packEnumerateObjects
+        -- * turn a packed object into a 
+        , packedObjectToObject
+        , packObjectFromRaw
+        ) where
 
 import Control.Applicative ((<$>))
 import Control.Arrow (second)
@@ -52,19 +52,19 @@ import Data.Word
 type PackedObjectRaw = (PackedObjectInfo, L.ByteString)
 
 data PackedObjectInfo = PackedObjectInfo
-	{ poiType       :: ObjectType
-	, poiOffset     :: Word64
-	, poiSize       :: Word64
-	, poiActualSize :: Word64
-	, poiExtra      :: Maybe ObjectPtr
-	} deriving (Show,Eq)
+        { poiType       :: ObjectType
+        , poiOffset     :: Word64
+        , poiSize       :: Word64
+        , poiActualSize :: Word64
+        , poiExtra      :: Maybe ObjectPtr
+        } deriving (Show,Eq)
 
 -- | Enumerate the pack refs available in this repository.
 packEnumerate repoPath = map onlyHash . filter isPackFile <$> getDirectoryContents (repoPath </> "objects" </> "pack")
-	where
-		isPackFile x = ".pack" `isSuffixOf` x
-		onlyHash = fromHexString . takebut 5 . drop 5
-		takebut n l = take (length l - n) l
+        where
+                isPackFile x = ".pack" `isSuffixOf` x
+                onlyHash = fromHexString . takebut 5 . drop 5
+                takebut n l = take (length l - n) l
 
 -- | open a pack
 packOpen :: FilePath -> Ref -> IO FileReader
@@ -76,14 +76,14 @@ packClose = fileReaderClose
 
 -- | return the number of entries in this pack
 packReadHeader repoPath packRef =
-	withFileReader (packPath repoPath packRef) $ \filereader ->
-		fileReaderParse filereader parseHeader
-	where parseHeader = do
-		packMagic <- be32 <$> A.take 4
-		when (packMagic /= 0x5041434b) $ error "not a git packfile"
-		ver <- be32 <$> A.take 4
-		when (ver /= 2) $ error ("pack file version not supported: " ++ show ver)
-		be32 <$> A.take 4
+        withFileReader (packPath repoPath packRef) $ \filereader ->
+                fileReaderParse filereader parseHeader
+        where parseHeader = do
+                packMagic <- be32 <$> A.take 4
+                when (packMagic /= 0x5041434b) $ error "not a git packfile"
+                ver <- be32 <$> A.take 4
+                when (ver /= 2) $ error ("pack file version not supported: " ++ show ver)
+                be32 <$> A.take 4
 
 -- | read an object at a specific position using a map function on the objectData
 packReadMapAtOffset fr offset mapData = fileReaderSeek fr offset >> getNextObject fr mapData
@@ -98,20 +98,20 @@ packReadRawAtOffset fr offset = fileReaderSeek fr offset >> getNextObjectRaw fr
 
 -- | enumerate all objects in this pack and callback to f for reach raw objects
 packEnumerateObjects repoPath packRef entries f =
-	withFileReader (packPath repoPath packRef) $ \filebuffer -> do
-		fileReaderSeek filebuffer 12
-		parseNext filebuffer entries
-	where
-		parseNext :: FileReader -> Int -> IO ()
-		parseNext _  0    = return ()
-		parseNext fr ents = getNextObjectRaw fr >>= f >> parseNext fr (ents-1)
+        withFileReader (packPath repoPath packRef) $ \filebuffer -> do
+                fileReaderSeek filebuffer 12
+                parseNext filebuffer entries
+        where
+                parseNext :: FileReader -> Int -> IO ()
+                parseNext _  0    = return ()
+                parseNext fr ents = getNextObjectRaw fr >>= f >> parseNext fr (ents-1)
 
 getNextObject :: FileReader -> (L.ByteString -> L.ByteString) -> IO (Maybe Object)
 getNextObject fr mapData =
-	packedObjectToObject . second mapData <$> getNextObjectRaw fr
+        packedObjectToObject . second mapData <$> getNextObjectRaw fr
 
 packedObjectToObject (PackedObjectInfo { poiType = ty, poiExtra = extra }, objData) =
-	packObjectFromRaw (ty, extra, objData)
+        packObjectFromRaw (ty, extra, objData)
 
 packObjectFromRaw (TypeCommit, Nothing, objData) = AL.maybeResult $ AL.parse objectParseCommit objData
 packObjectFromRaw (TypeTree, Nothing, objData)   = AL.maybeResult $ AL.parse objectParseTree objData
@@ -123,30 +123,30 @@ packObjectFromRaw _                              = error "can't happen unless so
 
 getNextObjectRaw :: FileReader -> IO PackedObjectRaw
 getNextObjectRaw fr = do
-	sobj      <- fileReaderGetPos fr
-	(ty, size) <- fileReaderParse fr parseObjectHeader
-	extra      <- case ty of
-		TypeDeltaRef -> Just . PtrRef . fromBinary <$> fileReaderGetBS 20 fr
-		TypeDeltaOff -> Just . PtrOfs . deltaOffFromList <$> fileReaderGetVLF fr
-		_            -> return Nothing
-	objData    <- fileReaderInflateToSize fr size
-	eobj       <- fileReaderGetPos fr
+        sobj      <- fileReaderGetPos fr
+        (ty, size) <- fileReaderParse fr parseObjectHeader
+        extra      <- case ty of
+                TypeDeltaRef -> Just . PtrRef . fromBinary <$> fileReaderGetBS 20 fr
+                TypeDeltaOff -> Just . PtrOfs . deltaOffFromList <$> fileReaderGetVLF fr
+                _            -> return Nothing
+        objData    <- fileReaderInflateToSize fr size
+        eobj       <- fileReaderGetPos fr
 
-	return (PackedObjectInfo ty sobj (eobj - sobj) size extra, objData)
-	where
-		parseObjectHeader = do
-			(m, ty, sz) <- splitFirst <$> anyWord8
-			size <- if m then (sz +) <$> getNextSize 4 else return sz
-			return (ty, size)
-			where
-				getNextSize n = do
-					(c, sz) <- splitOther n <$> anyWord8
-					if c then (sz +) <$> getNextSize (n+7) else return sz
+        return (PackedObjectInfo ty sobj (eobj - sobj) size extra, objData)
+        where
+                parseObjectHeader = do
+                        (m, ty, sz) <- splitFirst <$> anyWord8
+                        size <- if m then (sz +) <$> getNextSize 4 else return sz
+                        return (ty, size)
+                        where
+                                getNextSize n = do
+                                        (c, sz) <- splitOther n <$> anyWord8
+                                        if c then (sz +) <$> getNextSize (n+7) else return sz
 
-				splitFirst :: Word8 -> (Bool, ObjectType, Word64)
-				splitFirst w = (w `testBit` 7, toEnum $ fromIntegral ((w `shiftR` 4) .&. 0x7), fromIntegral (w .&. 0xf))
-				splitOther n w = (w `testBit` 7, fromIntegral (w .&. 0x7f) `shiftL` n)
+                                splitFirst :: Word8 -> (Bool, ObjectType, Word64)
+                                splitFirst w = (w `testBit` 7, toEnum $ fromIntegral ((w `shiftR` 4) .&. 0x7), fromIntegral (w .&. 0xf))
+                                splitOther n w = (w `testBit` 7, fromIntegral (w .&. 0x7f) `shiftL` n)
 
-		deltaOffFromList (x:xs) = foldl' acc (fromIntegral (x `clearBit` 7)) xs
-			where acc a w = ((a+1) `shiftL` 7) + fromIntegral (w `clearBit` 7)
-		deltaOffFromList [] = error "cannot happen"
+                deltaOffFromList (x:xs) = foldl' acc (fromIntegral (x `clearBit` 7)) xs
+                        where acc a w = ((a+1) `shiftL` 7) + fromIntegral (w `clearBit` 7)
+                deltaOffFromList [] = error "cannot happen"

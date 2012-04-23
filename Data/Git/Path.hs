@@ -26,15 +26,15 @@ remoteEntPath gitRepo name ent = remotePath gitRepo name </> ent
 packDirPath repoPath = repoPath </> "objects" </> "pack"
 
 indexPath repoPath indexRef =
-	packDirPath repoPath </> ("pack-" ++ toHexString indexRef ++ ".idx")
+        packDirPath repoPath </> ("pack-" ++ toHexString indexRef ++ ".idx")
 
 packPath repoPath packRef =
-	packDirPath repoPath </> ("pack-" ++ toHexString packRef ++ ".pack")
+        packDirPath repoPath </> ("pack-" ++ toHexString packRef ++ ".pack")
 
 objectPath repoPath d f = repoPath </> "objects" </> d </> f
 objectPathOfRef repoPath ref = objectPath repoPath d f
-	where (d,f) = toFilePathParts ref
+        where (d,f) = toFilePathParts ref
 
 objectTemporaryPath repoPath = do
-	r <- fst . random <$> getStdGen :: IO Int
-	return (repoPath </> "objects" </> ("tmp-" ++ show r ++ ".tmp"))
+        r <- fst . random <$> getStdGen :: IO Int
+        return (repoPath </> "objects" </> ("tmp-" ++ show r ++ ".tmp"))
