@@ -19,7 +19,7 @@ import Data.Git.Ref
 import Data.Git.Repository
 import Data.Git.Revision
 import Data.Word
-import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8 as BC
 import Text.Printf
 import qualified Data.Map as M
@@ -116,7 +116,7 @@ catFile ty ref git = do
 				Nothing  -> putStrLn $ objectTypeMarshall objty
 				Just ety -> do
 					when (ety /= objty) $ error "not expected type"
-					L.putStrLn (oiData obj)
+					LC.putStrLn (oiData obj)
 
 lsTree revision _ git = do
 	ref <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
