@@ -173,14 +173,12 @@ findReferencesWithPrefix git pre
 readRawFromPack :: Git -> Ref -> Word64 -> IO (FileReader, PackedObjectRaw)
 readRawFromPack git pref offset = do
         readers <- readIORef (packReaders git)
-        reader <- case lookup pref readers of
-                Just r  -> return r
-                Nothing -> do
-                        p <- packOpen (gitRepoPath git) pref
-                        modifyIORef (packReaders git) ((pref, p):)
-                        return p
+        reader  <- maybe getDefault return $ lookup pref readers
         po <- packReadRawAtOffset reader offset
         return (reader, po)
+    where getDefault = do p <- packOpen (gitRepoPath git) pref
+                          modifyIORef (packReaders git) ((pref, p):)
+                          return p
 
 readFromPack :: Git -> Ref -> Word64 -> Bool -> IO (Maybe ObjectInfo)
 readFromPack git pref o resolveDelta = do
