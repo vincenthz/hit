@@ -11,12 +11,8 @@ Category:            Development
 Stability:           experimental
 Build-Type:          Simple
 Homepage:            http://github.com/vincenthz/hit
-Cabal-Version:       >=1.6
+Cabal-Version:       >=1.8
 data-files:          README.md
-
-Flag test
-  Description:       Build unit test
-  Default:           False
 
 Flag executable
   Description:       Build the executable
@@ -38,7 +34,7 @@ Library
                    , vector
                    , random
                    , zlib
-                   , zlib-bindings >= 0.0.1
+                   , zlib-bindings >= 0.0.1 && < 0.1
                    , bytedump
   Exposed-modules:   Data.Git.Index
                      Data.Git.Pack
@@ -57,6 +53,7 @@ Library
 
 Executable           Hit
   Main-Is:           Hit.hs
+  hs-source-dirs:    Hit
   ghc-options:       -Wall -fno-warn-missing-signatures
   if flag(debug)
     ghc-options:     -rtsops -auto-all -caf-all
@@ -68,26 +65,26 @@ Executable           Hit
                    , hashtables
                    , bytestring
                    , attoparsec >= 0.10.1
+                   , parsec     >= 3
                    , filepath
                    , directory
-                   , zlib
                    , bytedump
+                   , hit
     Buildable: True
   else
     Buildable: False
 
-Executable           Tests
+Test-Suite test-hit
+  type:              exitcode-stdio-1.0
+  hs-source-dirs:    Tests
   Main-Is:           Tests.hs
-  if flag(test)
-    Buildable:       True
-    Build-depends:   base >= 3 && < 7
+  Build-depends:     base >= 3 && < 7
                    , HUnit
                    , QuickCheck >= 2
                    , bytestring
                    , test-framework >= 0.3
                    , test-framework-quickcheck2 >= 0.2
-  else
-    Buildable:       False
+                   , hit
 
 
 source-repository head
