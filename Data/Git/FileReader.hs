@@ -82,7 +82,7 @@ fileReaderGetNext fb = do
                 b <- B.hGet (fbHandle fb) 4096
                 if B.null b
                         then finishInflate (fbInflate fb)
-                        else maybe inflateTillPop return =<< withInflateInput (fbInflate fb) b id
+                        else (>>= maybe inflateTillPop return) =<< feedInflate (fbInflate fb) b
 
 fileReaderGetPos :: FileReader -> IO Word64
 fileReaderGetPos fr = do
