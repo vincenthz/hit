@@ -104,7 +104,7 @@ withRepo path f = bracket (openRepo path) closeRepo f
 
 --iterateIndexes :: Git -> (a -> (IdxRef, IndexReader) -> IO (a,Bool)) -> a -> IO a
 iterateIndexes git f initAcc = do
-        allIndexes    <- indexEnumerate (gitRepoPath git)
+        allIndexes    <- packIndexEnumerate (gitRepoPath git)
         readers       <- readIORef (indexReaders git)
         (a,terminate) <- loop initAcc readers
         if terminate
@@ -120,8 +120,8 @@ iterateIndexes git f initAcc = do
 
                 readRemainingIndexes acc []            = return acc
                 readRemainingIndexes acc (idxref:idxs) = do
-                        fr <- indexOpen (gitRepoPath git) idxref
-                        idx <- indexReadHeader fr
+                        fr <- packIndexOpen (gitRepoPath git) idxref
+                        idx <- packIndexReadHeader fr
                         let idxreader = PackIndexReader idx fr
                         let r = (idxref, idxreader)
                         modifyIORef (indexReaders git) (\l -> r : l)
@@ -142,7 +142,7 @@ findReference git ref = maybe NotFound id <$> (findLoose `mplusIO` findInIndexes
                 findInIndexes = iterateIndexes git isinIndex Nothing --f -> (a -> IndexReader -> IO (a,Bool)) -> a -> IO a
 
                 isinIndex acc (idxref, (PackIndexReader idxhdr indexreader)) = do
-                        mloc <- indexGetReferenceLocation idxhdr indexreader ref
+                        mloc <- packIndexGetReferenceLocation idxhdr indexreader ref
                         case mloc of
                                 Nothing  -> return (acc, False)
                                 Just loc -> return (Just $ Packed idxref loc, True)
@@ -167,7 +167,7 @@ findReferencesWithPrefix git pre
                 invalidLength = length pre < 2 || length pre > 39 
 
                 idxPrefixMatch acc (_, (PackIndexReader idxhdr indexreader)) = do
-                        refs <- indexGetReferencesWithPrefix idxhdr indexreader pre
+                        refs <- packIndexGetReferencesWithPrefix idxhdr indexreader pre
                         return (refs:acc,False)
 
 readRawFromPack :: Git -> Ref -> Word64 -> IO (FileReader, PackedObjectRaw)
