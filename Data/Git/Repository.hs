@@ -49,7 +49,7 @@ import Data.ByteString (ByteString)
 
 import Data.Git.Delta
 import Data.Git.FileReader
-import Data.Git.Index
+import Data.Git.PackIndex
 import Data.Git.Pack
 import Data.Git.Named
 import Data.Git.Object
@@ -57,13 +57,13 @@ import Data.Git.Revision
 import Data.Git.Loose
 import Data.Git.Ref
 
-data IndexReader = IndexReader IndexHeader FileReader
+data PackIndexReader = PackIndexReader PackIndexHeader FileReader
 
 -- | represent an git repo, with possibly already opened filereaders
 -- for indexes and packs
 data Git = Git
         { gitRepoPath  :: FilePath
-        , indexReaders :: IORef [(Ref, IndexReader)]
+        , indexReaders :: IORef [(Ref, PackIndexReader)]
         , packReaders  :: IORef [(Ref, FileReader)]
         }
 
@@ -80,7 +80,7 @@ closeRepo :: Git -> IO ()
 closeRepo (Git { indexReaders = ireaders, packReaders = preaders }) = do
         mapM_ (closeIndexReader . snd) =<< readIORef ireaders
         mapM_ (fileReaderClose . snd) =<< readIORef preaders
-        where closeIndexReader (IndexReader _ fr) = fileReaderClose fr
+        where closeIndexReader (PackIndexReader _ fr) = fileReaderClose fr
 
 -- | find the git repository from the current directory.
 findRepo :: IO FilePath
@@ -122,7 +122,7 @@ iterateIndexes git f initAcc = do
                 readRemainingIndexes acc (idxref:idxs) = do
                         fr <- indexOpen (gitRepoPath git) idxref
                         idx <- indexReadHeader fr
-                        let idxreader = IndexReader idx fr
+                        let idxreader = PackIndexReader idx fr
                         let r = (idxref, idxreader)
                         modifyIORef (indexReaders git) (\l -> r : l)
                         (nacc, terminate) <- f acc r
@@ -141,7 +141,7 @@ findReference git ref = maybe NotFound id <$> (findLoose `mplusIO` findInIndexes
                 findInIndexes :: IO (Maybe ObjectLocation)
                 findInIndexes = iterateIndexes git isinIndex Nothing --f -> (a -> IndexReader -> IO (a,Bool)) -> a -> IO a
 
-                isinIndex acc (idxref, (IndexReader idxhdr indexreader)) = do
+                isinIndex acc (idxref, (PackIndexReader idxhdr indexreader)) = do
                         mloc <- indexGetReferenceLocation idxhdr indexreader ref
                         case mloc of
                                 Nothing  -> return (acc, False)
@@ -166,7 +166,7 @@ findReferencesWithPrefix git pre
                 matchRef ref = pre `isPrefixOf` toHexString ref
                 invalidLength = length pre < 2 || length pre > 39 
 
-                idxPrefixMatch acc (_, (IndexReader idxhdr indexreader)) = do
+                idxPrefixMatch acc (_, (PackIndexReader idxhdr indexreader)) = do
                         refs <- indexGetReferencesWithPrefix idxhdr indexreader pre
                         return (refs:acc,False)
 

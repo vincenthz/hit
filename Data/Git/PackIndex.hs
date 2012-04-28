@@ -1,19 +1,19 @@
 -- |
--- Module      : Data.Git.Index
+-- Module      : Data.Git.PackIndex
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unix
 --
 {-# LANGUAGE OverloadedStrings, BangPatterns #-}
-module Data.Git.Index
-        ( IndexHeader(..)
-        , Index(..)
+module Data.Git.PackIndex
+        ( PackIndexHeader(..)
+        , PackIndex(..)
 
         -- * handles and enumeration
         , indexOpen
         , indexClose
-        , withIndex
+        , withPackIndex
         , indexEnumerate
 
         -- * read from index
@@ -47,10 +47,10 @@ import Data.Git.Path
 import Data.Git.Ref
 
 -- | represent an index header with the version and the fanout table
-data IndexHeader = IndexHeader !Word32 !(Vector Word32)
+data PackIndexHeader = PackIndexHeader !Word32 !(Vector Word32)
         deriving (Show,Eq)
 
-data Index = Index
+data PackIndex = PackIndex
         { indexSha1s        :: Vector Ref
         , indexCRCs         :: Vector Word32
         , indexPackoffs     :: Vector Word32
@@ -74,26 +74,26 @@ indexClose :: FileReader -> IO ()
 indexClose = fileReaderClose
 
 -- | variant of withFile on the index file and with a FileReader
-withIndex repoPath indexRef = withFileReader (indexPath repoPath indexRef)
+withPackIndex repoPath indexRef = withFileReader (indexPath repoPath indexRef)
 
 -- | returns the number of references, referenced in this index.
-indexHeaderGetSize :: IndexHeader -> Word32
-indexHeaderGetSize (IndexHeader _ indexes) = indexes ! 255
+indexHeaderGetSize :: PackIndexHeader -> Word32
+indexHeaderGetSize (PackIndexHeader _ indexes) = indexes ! 255
 
 -- | byte size of an index header.
 indexHeaderByteSize :: Int
 indexHeaderByteSize = 2*4 {- header -} + 256*4 {- fanout table -}
 
 -- | get the number of reference in this index with a specific prefix
-indexHeaderGetNbWithPrefix :: IndexHeader -> Int -> Word32
-indexHeaderGetNbWithPrefix (IndexHeader _ indexes) n
+indexHeaderGetNbWithPrefix :: PackIndexHeader -> Int -> Word32
+indexHeaderGetNbWithPrefix (PackIndexHeader _ indexes) n
         | n < 0 || n > 255 = 0
         | n == 0           = indexes ! 0
         | otherwise        = (indexes ! n) - (indexes ! (n-1))
 
 -- | fold on refs with a specific prefix
-indexHeaderFoldRef :: IndexHeader -> FileReader -> Int -> (a -> Word32 -> Ref -> (a, Bool)) -> a -> IO a
-indexHeaderFoldRef idxHdr@(IndexHeader _ indexes) fr refprefix f initAcc
+indexHeaderFoldRef :: PackIndexHeader -> FileReader -> Int -> (a -> Word32 -> Ref -> (a, Bool)) -> a -> IO a
+indexHeaderFoldRef idxHdr@(PackIndexHeader _ indexes) fr refprefix f initAcc
         | nb == 0   = return initAcc
         | otherwise = do
                 let spos = (indexes ! refprefix) - nb
@@ -111,8 +111,8 @@ indexHeaderFoldRef idxHdr@(IndexHeader _ indexes) fr refprefix f initAcc
                 (sha1Offset,_,_) = indexOffsets idxHdr
 
 -- | return the reference offset in the packfile if found
-indexGetReferenceLocation :: IndexHeader -> FileReader -> Ref -> IO (Maybe Word64)
-indexGetReferenceLocation idxHdr@(IndexHeader _ indexes) fr ref = do
+indexGetReferenceLocation :: PackIndexHeader -> FileReader -> Ref -> IO (Maybe Word64)
+indexGetReferenceLocation idxHdr@(PackIndexHeader _ indexes) fr ref = do
         mrpos <- indexHeaderFoldRef idxHdr fr refprefix f Nothing
         case mrpos of
                 Nothing   -> return Nothing
@@ -127,7 +127,7 @@ indexGetReferenceLocation idxHdr@(IndexHeader _ indexes) fr ref = do
                 (_,_,packOffset) = indexOffsets idxHdr
 
 -- | get all references that start by prefix.
-indexGetReferencesWithPrefix :: IndexHeader -> FileReader -> String -> IO [Ref]
+indexGetReferencesWithPrefix :: PackIndexHeader -> FileReader -> String -> IO [Ref]
 indexGetReferencesWithPrefix idxHdr fr prefix =
         indexHeaderFoldRef idxHdr fr refprefix f []
         where
@@ -148,28 +148,28 @@ indexOffsets idx = (indexSha1sOffset, indexCRCsOffset, indexPackOffOffset)
                 sz                 = indexHeaderGetSize idx
 
 -- | parse index header
-parseIndexHeader = do
+parsePackIndexHeader = do
         magic   <- be32 <$> A.take 4
         when (magic /= 0xff744f63) $ error "wrong magic number for index"
         ver     <- be32 <$> A.take 4
         when (ver /= 2) $ error "unsupported index version"
         fanouts <- V.replicateM 256 (be32 <$> A.take 4)
-        return $ IndexHeader ver fanouts
+        return $ PackIndexHeader ver fanouts
 
 -- | read index header from an index filereader
-indexReadHeader :: FileReader -> IO IndexHeader
-indexReadHeader fr = fileReaderSeek fr 0 >> fileReaderParse fr parseIndexHeader
+indexReadHeader :: FileReader -> IO PackIndexHeader
+indexReadHeader fr = fileReaderSeek fr 0 >> fileReaderParse fr parsePackIndexHeader
 
 -- | get index header from an index reference
-indexGetHeader :: FilePath -> Ref -> IO IndexHeader
-indexGetHeader repoPath indexRef = withIndex repoPath indexRef $ indexReadHeader
+indexGetHeader :: FilePath -> Ref -> IO PackIndexHeader
+indexGetHeader repoPath indexRef = withPackIndex repoPath indexRef $ indexReadHeader
 
 -- | read all index
 indexRead repoPath indexRef = do
-        withIndex repoPath indexRef $ \fr -> do
-                idx <- fileReaderParse fr parseIndexHeader
-                liftM2 (,) (return idx) (fileReaderParse fr (parseIndex $ indexHeaderGetSize idx))
-        where parseIndex sz = do
+        withPackIndex repoPath indexRef $ \fr -> do
+                idx <- fileReaderParse fr parsePackIndexHeader
+                liftM2 (,) (return idx) (fileReaderParse fr (parsePackIndex $ indexHeaderGetSize idx))
+        where parsePackIndex sz = do
                 sha1s     <- V.replicateM (fromIntegral sz) (fromBinary <$> A.take 20)
                 crcs      <- V.replicateM (fromIntegral sz) (be32 <$> A.take 4)
                 packoffs  <- V.replicateM (fromIntegral sz) (be32 <$> A.take 4)

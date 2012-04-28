@@ -36,7 +36,7 @@ Library
                    , zlib
                    , zlib-bindings >= 0.1 && < 0.2
                    , bytedump
-  Exposed-modules:   Data.Git.Index
+  Exposed-modules:   Data.Git.PackIndex
                      Data.Git.Pack
                      Data.Git.Object
                      Data.Git.Loose
