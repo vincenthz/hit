@@ -134,19 +134,20 @@ looseWriteBlobFromFile repoPath file = do
         let hdr = objectWriteHeader TypeBlob (fromIntegral fsz)
         tmpPath <- objectTemporaryPath repoPath
         flip onException (removeFile tmpPath) $ do
-                npath <- withFileWriter tmpPath $ \fw -> do
+                (ref, npath) <- withFileWriter tmpPath $ \fw -> do
                         fileWriterOutput fw hdr
                         chunks <- L.toChunks <$> L.readFile file
                         mapM_ (fileWriterOutput fw) chunks
                         digest <- fileWriterGetDigest fw
-                        return $ objectPathOfRef repoPath digest
+                        return (digest, objectPathOfRef repoPath digest)
                 exists <- doesFileExist npath
                 when exists $ error "destination already exists"
                 renameFile tmpPath npath
+                return ref
 
 -- | write an object to disk as a loose reference.
 -- use looseWriteBlobFromFile for efficiently writing blobs when being commited from a file.
-looseWrite repoPath obj = L.writeFile (objectPathOfRef repoPath ref) content
+looseWrite repoPath obj = L.writeFile (objectPathOfRef repoPath ref) content >> return ref
         where
                 content = looseMarshall obj
                 ref     = hashLBS content
