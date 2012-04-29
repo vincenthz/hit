@@ -24,6 +24,7 @@ module Data.Git.Repository
         , findCommit
         , findTree
         , findObjectAt
+        , rewrite
         , buildHTree
         , resolvePath
         , resolveTreeish
@@ -42,6 +43,7 @@ import qualified Control.Exception as E
 import Control.Monad
 
 import Data.Word
+import Data.Maybe (fromMaybe)
 import Data.IORef
 import Data.List ((\\), find, isPrefixOf)
 
@@ -316,6 +318,42 @@ resolveTreeish git ref = findObject git ref True >>= mapJustM recToTree where
         recToTree (objectToTag    -> Just (Tag tref _ _ _ _))    = resolveTreeish git tref
         recToTree (objectToTree   -> Just t@(Tree _))            = return $ Just t
         recToTree _                                              = return Nothing
+
+
+-- | Rewrite a set of commits from a revision and returns the new ref.
+--
+-- If during revision traversal (diving) there's a commit with zero or multiple
+-- parents then the traversal will stop regardless of the amount of parent requested.
+--
+-- calling "rewrite f 2 (revisionOf d)" on the following tree:
+--
+--          a <-- b <-- c <-- d
+--
+-- result in the following tree after mapping with f:
+--
+--          a <-- f(b) <-- f(c) <-- f(d)
+--
+rewrite :: Git -> (Commit -> IO Commit) -> Revision -> Int -> IO Ref
+rewrite git mapCommit revision nbParent = do
+    ref <- fromMaybe (error "revision cannot be found") <$> resolveRevision git revision
+    resolveParents nbParent ref >>= process . reverse
+
+    where resolveParents :: Int -> Ref -> IO [ (Ref, Commit) ]
+          resolveParents 0 ref = (:[]) . (,) ref . fromMaybe (error "commit cannot be found") <$> findCommit git ref
+          resolveParents n ref = do commit <- fromMaybe (error "commit cannot be found") <$> findCommit git ref
+                                    case commitParents commit of
+                                         [parentRef] -> liftM ((ref,commit) :) (resolveParents (n-1) parentRef)
+                                         _           -> return [(ref,commit)]
+
+          process [] = error "nothing to rewrite"
+          process ((_,commit):next) =
+                      mapCommit commit >>= looseWrite (gitRepoPath git) . objectWrap >>= flip rewriteOne next
+
+          rewriteOne prevRef [] = return prevRef
+          rewriteOne prevRef ((_,commit):next) = do
+                      newCommit <- mapCommit $ commit { commitParents = [prevRef] }
+                      ref       <- looseWrite (gitRepoPath git) (objectWrap newCommit)
+                      rewriteOne ref next
 
 -- | build a hierarchy tree from a tree object
 buildHTree :: Git -> Tree -> IO HTree
