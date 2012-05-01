@@ -15,6 +15,7 @@ import Data.IORef
 import Data.Maybe
 import Data.Git.Pack
 import Data.Git.Object
+import Data.Git.Types
 import Data.Git.Ref
 import Data.Git.Repository
 import Data.Git.Revision

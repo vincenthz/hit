@@ -11,6 +11,7 @@ import Control.Monad
 import Data.Git.Object
 import Data.Git.Loose
 import Data.Git.Ref
+import Data.Git.Types
 
 -- for arbitrary instance to generate only data that are writable
 -- to disk. i.e. no deltas.

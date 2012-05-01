@@ -54,6 +54,7 @@ import Data.Git.FileReader
 import Data.Git.PackIndex
 import Data.Git.Pack
 import Data.Git.Named
+import Data.Git.Types
 import Data.Git.Object
 import Data.Git.Revision
 import Data.Git.Loose

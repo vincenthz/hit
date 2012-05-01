@@ -14,12 +14,6 @@ module Data.Git.Object
         , ObjectData
         , ObjectPtr(..)
         , Object(..)
-        , Tree(..)
-        , Commit(..)
-        , Blob(..)
-        , Tag(..)
-        , DeltaOfs(..)
-        , DeltaRef(..)
         , ObjectInfo(..)
         , objectWrap
         , objectToType
@@ -47,7 +41,7 @@ module Data.Git.Object
         ) where
 
 import Data.Git.Ref
-import Data.Git.Delta
+import Data.Git.Types
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -70,27 +64,6 @@ import Blaze.ByteString.Builder.ByteString
 
 -- | location of an object in the database
 data ObjectLocation = NotFound | Loose Ref | Packed Ref Word64
-        deriving (Show,Eq)
-
--- | represent one entry in the tree
--- (permission,file or directory name,blob or tree ref)
--- name should maybe a filepath, but not sure about the encoding.
-type TreeEnt = (Int,ByteString,Ref)
-
--- | an author or committer line
--- has the format: name <email> time timezone
--- FIXME: should be a string, but I don't know if the data is stored
--- consistantly in one encoding (UTF8)
-type Name = (ByteString,ByteString,Int,Int)
-
--- | type of a git object.
-data ObjectType =
-          TypeTree
-        | TypeBlob
-        | TypeCommit
-        | TypeTag
-        | TypeDeltaOff
-        | TypeDeltaRef
         deriving (Show,Eq)
 
 -- | Delta objects points to some others objects in the database
@@ -130,27 +103,6 @@ data Object = forall a . Objectable a => Object a
 
 objectWrap :: Objectable a => a -> Object
 objectWrap a = Object a
-
-data Tree = Tree { treeGetEnts :: [TreeEnt] } deriving (Show,Eq)
-data Blob = Blob { blobGetContent :: L.ByteString } deriving (Show,Eq)
-data Commit = Commit
-        { commitTreeish   :: Ref
-        , commitParents   :: [Ref]
-        , commitAuthor    :: Name
-        , commitCommitter :: Name
-        , commitMessage   :: ByteString
-        } deriving (Show,Eq)
-data Tag = Tag
-        { tagRef        :: Ref
-        , tagObjectType :: ObjectType
-        , tagBlob       :: ByteString
-        , tagName       :: Name
-        , tagS          :: ByteString
-        } deriving (Show,Eq)
-data DeltaOfs = DeltaOfs Word64 Delta
-        deriving (Show,Eq)
-data DeltaRef = DeltaRef Ref Delta
-        deriving (Show,Eq)
 
 objectToType :: Object -> ObjectType
 objectToType (Object a) = getType a

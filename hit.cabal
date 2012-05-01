@@ -39,6 +39,7 @@ Library
   Exposed-modules:   Data.Git.PackIndex
                      Data.Git.Pack
                      Data.Git.Object
+                     Data.Git.Types
                      Data.Git.Loose
                      Data.Git.Named
                      Data.Git.Delta

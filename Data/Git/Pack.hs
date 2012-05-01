@@ -45,6 +45,7 @@ import Data.Git.Path
 import Data.Git.Object
 import Data.Git.Delta
 import Data.Git.Ref
+import Data.Git.Types
 import Data.Git.FileReader
 
 import Data.Word
