@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- |
 -- Module      : Data.Git.Object
 -- License     : BSD-style
@@ -6,7 +7,6 @@
 -- Stability   : experimental
 -- Portability : unix
 --
-{-# LANGUAGE OverloadedStrings #-}
 module Data.Git.Object
         ( ObjectLocation(..)
         , ObjectType(..)
@@ -140,23 +140,6 @@ objectToTag (Object a) = toTag a
 
 objectToBlob :: Object -> Maybe Blob
 objectToBlob (Object a) = toBlob a
-
--- | the enum instance is useful when marshalling to pack file.
-instance Enum ObjectType where
-        fromEnum TypeCommit   = 0x1
-        fromEnum TypeTree     = 0x2
-        fromEnum TypeBlob     = 0x3
-        fromEnum TypeTag      = 0x4
-        fromEnum TypeDeltaOff = 0x6
-        fromEnum TypeDeltaRef = 0x7
-
-        toEnum 0x1 = TypeCommit
-        toEnum 0x2 = TypeTree
-        toEnum 0x3 = TypeBlob
-        toEnum 0x4 = TypeTag
-        toEnum 0x6 = TypeDeltaOff
-        toEnum 0x7 = TypeDeltaRef
-        toEnum n   = error ("not a valid object: " ++ show n)
 
 octal :: Parser Int
 octal = B.foldl' step 0 `fmap` takeWhile1 isOct where
@@ -295,4 +278,5 @@ objectHash ty w lbs = hashLBS $ L.fromChunks (objectWriteHeader ty w : L.toChunk
 -- used for objectWrite for commit and tag
 writeName label (name, email, time, tz) =
         B.concat [label, " ", name, " <", email, "> ", BC.pack (show time), " ", BC.pack (showtz tz)]
-        where showtz i = (if i > 0 then "+" else "") ++ show i
+        where showtz :: Int -> String
+              showtz i = printf "%s%.4d" (if i > 0 then "+" else "" :: String) i

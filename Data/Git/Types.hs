@@ -40,6 +40,23 @@ data ObjectType =
         | TypeDeltaRef
         deriving (Show,Eq)
 
+-- | the enum instance is useful when marshalling to pack file.
+instance Enum ObjectType where
+        fromEnum TypeCommit   = 0x1
+        fromEnum TypeTree     = 0x2
+        fromEnum TypeBlob     = 0x3
+        fromEnum TypeTag      = 0x4
+        fromEnum TypeDeltaOff = 0x6
+        fromEnum TypeDeltaRef = 0x7
+
+        toEnum 0x1 = TypeCommit
+        toEnum 0x2 = TypeTree
+        toEnum 0x3 = TypeBlob
+        toEnum 0x4 = TypeTag
+        toEnum 0x6 = TypeDeltaOff
+        toEnum 0x7 = TypeDeltaRef
+        toEnum n   = error ("not a valid object: " ++ show n)
+
 -- | represent one entry in the tree
 -- (permission,file or directory name,blob or tree ref)
 -- name should maybe a filepath, but not sure about the encoding.
