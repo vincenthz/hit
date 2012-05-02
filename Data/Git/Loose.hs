@@ -122,7 +122,7 @@ looseEnumerateWithPrefix repoPath prefix =
 -- | marshall as lazy bytestring an object except deltas.
 looseMarshall obj
         | objectIsDelta obj = error "cannot write delta object loose"
-        | otherwise         = compress $ L.concat [ L.fromChunks [hdrB], objData ]
+        | otherwise         = L.concat [ L.fromChunks [hdrB], objData ]
         where
                 objData = objectWrite obj
                 hdrB    = objectWriteHeader (objectToType obj) (fromIntegral $ L.length objData)
@@ -149,7 +149,7 @@ looseWriteBlobFromFile repoPath file = do
 -- use looseWriteBlobFromFile for efficiently writing blobs when being commited from a file.
 looseWrite repoPath obj = createDirectoryIfMissing True (takeDirectory path)
                        >> doesFileExist path
-                       >>= \exists -> unless exists (L.writeFile path content)
+                       >>= \exists -> unless exists (L.writeFile path $ compress content)
                        >> return ref
         where
                 path    = objectPathOfRef repoPath ref
