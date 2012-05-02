@@ -57,6 +57,9 @@ import Control.Monad
 import Data.Word
 import Text.Printf
 
+import Data.Time.LocalTime
+import Data.Time.Clock.POSIX
+
 {-
 import Blaze.ByteString.Builder
 import Blaze.ByteString.Builder.ByteString
@@ -193,11 +196,13 @@ parseName = do
         skipChar '<'
         email <- PC.takeWhile ((/=) '>')
         _ <- string "> "
-        time <- PC.decimal
+        time <- PC.decimal :: Parser Integer
         _ <- string " "
         timezone <- PC.signed PC.decimal
+        let (hours,minutes) = timezone `divMod` 100
         skipChar '\n'
-        return (name, email, time, timezone)
+        let tz = minutesToTimeZone (hours*60 + (if hours > 0 then minutes else (-minutes)))
+        return (name, email, posixSecondsToUTCTime $ fromIntegral time, tz)
 
 objectParseTree = objectWrap <$> treeParse
 objectParseCommit = objectWrap <$> commitParse
@@ -277,6 +282,6 @@ objectHash ty w lbs = hashLBS $ L.fromChunks (objectWriteHeader ty w : L.toChunk
 
 -- used for objectWrite for commit and tag
 writeName label (name, email, time, tz) =
-        B.concat [label, " ", name, " <", email, "> ", BC.pack (show time), " ", BC.pack (showtz tz)]
-        where showtz :: Int -> String
-              showtz i = printf "%s%.4d" (if i > 0 then "+" else "" :: String) i
+        B.concat [label, " ", name, " <", email, "> ", BC.pack (printf "%d %s" timeSeconds (timeZoneOffsetString tz)) ]
+        where timeSeconds :: Integer
+              timeSeconds = truncate (realToFrac $ utcTimeToPOSIXSeconds time :: Double)

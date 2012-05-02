@@ -36,6 +36,7 @@ Library
                    , zlib
                    , zlib-bindings >= 0.1 && < 0.2
                    , bytedump
+                   , time
   Exposed-modules:   Data.Git.PackIndex
                      Data.Git.Pack
                      Data.Git.Object
@@ -85,6 +86,7 @@ Test-Suite test-hit
                    , bytestring
                    , test-framework >= 0.3
                    , test-framework-quickcheck2 >= 0.2
+                   , time
                    , hit
 
 

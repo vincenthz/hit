@@ -12,6 +12,9 @@ import Data.Git.Object
 import Data.Git.Loose
 import Data.Git.Ref
 import Data.Git.Types
+import Data.Time.LocalTime
+import Data.Time.Clock
+import Data.Time.Calendar
 
 -- for arbitrary instance to generate only data that are writable
 -- to disk. i.e. no deltas.
@@ -38,10 +41,17 @@ arbitraryRefList = replicateM 2 arbitrary
 arbitraryEnt = liftM3 (,,) arbitrary (arbitraryBSno0 48) arbitrary
 arbitraryEnts = choose (1,100) >>= \i -> replicateM i arbitraryEnt
 
+instance Arbitrary TimeZone where
+    arbitrary = hoursToTimeZone <$> arbitrary 
+
+instance Arbitrary UTCTime where
+    arbitrary = UTCTime <$> (flip addDays b <$> choose (0, 365 * 40))
+                        <*> (secondsToDiffTime <$> arbitrary)
+        where b = fromGregorian 1970 1 1
 arbitraryName = liftM4 (,,,) (arbitraryBSnoangle 16)
                              (arbitraryBSnoangle 16)
-                             (arbitrary `suchThat` (\i -> i > 0))
-                              arbitrary
+                             arbitrary
+                             arbitrary
 
 arbitraryObjTypeNoDelta = oneof [return TypeTree,return TypeBlob,return TypeCommit,return TypeTag]
 
