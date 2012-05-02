@@ -245,7 +245,10 @@ findObjectAt git loc resolveDelta = maybe Nothing toObject <$> findObjectRawAt g
                 toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 
 -- | get an object from repository using a ref.
-findObject :: Git -> Ref -> Bool -> IO (Maybe Object)
+findObject :: Git               -- ^ repository
+           -> Ref               -- ^ the object's reference to
+           -> Bool              -- ^ whether to resolve deltas if found
+           -> IO (Maybe Object) -- ^ returned object if found
 findObject git ref resolveDelta = maybe Nothing toObject <$> findObjectRaw git ref resolveDelta
         where
                 toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
@@ -254,12 +257,14 @@ findObject git ref resolveDelta = maybe Nothing toObject <$> findObjectRaw git r
 mapJustM f (Just o) = f o
 mapJustM _ Nothing  = return Nothing
 
+-- | find a specified commit
 findCommit :: Git -> Ref -> IO (Maybe Commit)
 findCommit git ref = findObject git ref True >>= mapJustM unwrap
         where
                 unwrap (objectToCommit -> Just c@(Commit _ _ _ _ _)) = return $ Just c
                 unwrap _                                             = return Nothing
 
+-- | find a specified tree
 findTree :: Git -> Ref -> IO (Maybe Tree)
 findTree git ref = findObject git ref True >>= mapJustM unwrap
         where
@@ -334,7 +339,11 @@ resolveTreeish git ref = findObject git ref True >>= mapJustM recToTree where
 --
 --          a <-- f(b) <-- f(c) <-- f(d)
 --
-rewrite :: Git -> (Commit -> IO Commit) -> Revision -> Int -> IO Ref
+rewrite :: Git                   -- ^ Repository
+        -> (Commit -> IO Commit) -- ^ Mapping function
+        -> Revision              -- ^ revision to start from
+        -> Int                   -- ^ the number of parents to map
+        -> IO Ref                -- ^ return the new head REF
 rewrite git mapCommit revision nbParent = do
     ref <- fromMaybe (error "revision cannot be found") <$> resolveRevision git revision
     resolveParents nbParent ref >>= process . reverse
