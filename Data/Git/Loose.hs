@@ -116,6 +116,7 @@ looseEnumerateWithPrefixFilter repoPath prefix filterF =
                 getDir p = E.catch (getDirectoryContents p) (\(_::SomeException) -> return [])
                 isRef l = length l == 38
 
+looseEnumerateWithPrefix :: FilePath -> String -> IO [Ref]
 looseEnumerateWithPrefix repoPath prefix =
         looseEnumerateWithPrefixFilter repoPath prefix (const True)
 
