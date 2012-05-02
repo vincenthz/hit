@@ -13,6 +13,7 @@ Build-Type:          Simple
 Homepage:            http://github.com/vincenthz/hit
 Cabal-Version:       >=1.8
 data-files:          README.md
+extra-source-files:  Tests/*.hs
 
 Flag executable
   Description:       Build the executable
@@ -76,7 +77,7 @@ Executable           Hit
   else
     Buildable: False
 
-Test-Suite test-hit
+Test-Suite test-unit
   type:              exitcode-stdio-1.0
   hs-source-dirs:    Tests
   Main-Is:           Tests.hs
@@ -89,6 +90,19 @@ Test-Suite test-hit
                    , time
                    , hit
 
+Test-Suite test-repository
+  type:              exitcode-stdio-1.0
+  hs-source-dirs:    Tests
+  Main-Is:           Repo.hs
+  Build-depends:     base >= 3 && < 7
+                   , HUnit
+                   , QuickCheck >= 2
+                   , bytestring
+                   , test-framework >= 0.3
+                   , test-framework-quickcheck2 >= 0.2
+                   , time
+                   , bytedump
+                   , hit
 
 source-repository head
   type: git
