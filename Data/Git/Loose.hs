@@ -147,7 +147,11 @@ looseWriteBlobFromFile repoPath file = do
 
 -- | write an object to disk as a loose reference.
 -- use looseWriteBlobFromFile for efficiently writing blobs when being commited from a file.
-looseWrite repoPath obj = L.writeFile (objectPathOfRef repoPath ref) content >> return ref
+looseWrite repoPath obj = createDirectoryIfMissing True (takeDirectory path)
+                       >> doesFileExist path
+                       >>= \exists -> unless exists (L.writeFile path content)
+                       >> return ref
         where
+                path    = objectPathOfRef repoPath ref
                 content = looseMarshall obj
                 ref     = hashLBS content
