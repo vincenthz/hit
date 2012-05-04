@@ -15,15 +15,18 @@ what is doesn't do:
 * reimplement the whole of git.
 * checkout's index reading/writing, fetching, merging, diffing.
 
-The main functions for users are available from the Data.Git.Repository module.
+The main functions for users are available from the Data.Git module.
 
 The essential functions are:
 
 * withRepo: create a new git context and execute a function with the context. functional equivalent of withFile but for git repository.
+* withCurrentRepo: similar to withRepo but found the repository from the user current directory.
 * resolveRevision: turns a git revision (e.g. HEAD, 0a24^^^~3) into a SHA1 reference.
 * resolvePath: from a commit ref and a path, it will gives the tree or blob reference of the object at the specific path (see example).
-* findObject: from a SHA1 reference, gives a high level object (Commit, Blob, Tree, Tag, Delta) from the git repository. if called with resolveDelta set, it will resolves deltas to be simple objects with the deltas applied.
-* findObjectRaw: similar to findObject but gives a raw representation (lazy bytestring) of the object.
+* getObject: from a SHA1 reference, gives a high level object (Commit, Blob, Tree, Tag, Delta) from the git repository. if called with resolveDelta set, it will resolves deltas to be simple objects with the deltas applied.
+* getObjectRaw: similar to getObject but gives a raw representation (lazy bytestring) of the object.
+* getCommit: similar to getObject but gives back a commit.
+* getTree: similar to getObject but gives back a tree.
 
 API Example
 -----------
@@ -43,7 +46,7 @@ catting an object from a ref:
     import Data.Git.Repository
 
     catFile ref = withRepo ".git" $ \git -> do
-        obj <- maybe (error "not a valid object") id `fmap` findObjectRaw git ref True
+        obj <- maybe (error "not a valid object") id `fmap` getObjectRaw git ref True
         L.putStrLn (oiData obj)
 
 
