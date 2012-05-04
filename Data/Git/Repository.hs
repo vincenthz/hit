@@ -15,6 +15,7 @@ module Data.Git.Repository
         , openRepo
         , closeRepo
         , withRepo
+        , withCurrentRepo
         , findRepo
         , findReference
         , findReferencesWithPrefix
@@ -85,7 +86,10 @@ closeRepo (Git { indexReaders = ireaders, packReaders = preaders }) = do
         mapM_ (fileReaderClose . snd) =<< readIORef preaders
         where closeIndexReader (PackIndexReader _ fr) = fileReaderClose fr
 
--- | find the git repository from the current directory.
+-- | Find the git repository from the current directory.
+--
+-- If the environment variable GIT_DIR is set then it's used,
+-- otherwise iterate from current directory, up to 128 parents for a .git directory
 findRepo :: IO FilePath
 findRepo = do
         menvDir <- E.catch (Just <$> getEnv "GIT_DIR") (\(_:: SomeException) -> return Nothing)
@@ -104,6 +108,12 @@ findRepo = do
 
 -- | execute a function f with a git context.
 withRepo path f = bracket (openRepo path) closeRepo f
+
+-- | execute a function on the current repository.
+--
+-- check findRepo to see how the git repository is found.
+withCurrentRepo :: (Git -> IO a) -> IO a
+withCurrentRepo f = findRepo >>= \path -> withRepo path f
 
 --iterateIndexes :: Git -> (a -> (IdxRef, IndexReader) -> IO (a,Bool)) -> a -> IO a
 iterateIndexes git f initAcc = do
@@ -133,6 +143,7 @@ iterateIndexes git f initAcc = do
                                 then return nacc
                                 else readRemainingIndexes nacc idxs
 
+-- | Get the object location of a specific reference
 findReference :: Git -> Ref -> IO ObjectLocation
 findReference git ref = maybe NotFound id <$> (findLoose `mplusIO` findInIndexes)
         where
