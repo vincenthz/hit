@@ -53,7 +53,7 @@ verifyPack pref git = do
 			| objectTypeIsDelta (poiType info) = do
 				(!ty, !ref, !ptr, !lenChain) <- do
 					let loc = Packed pref (poiOffset info)
-					objInfo <- maybe (error "cannot find delta chain") id <$> findObjectRawAt git loc True
+					objInfo <- maybe (error "cannot find delta chain") id <$> getObjectRawAt git loc True
 					let (ty, sz, _) = oiHeader objInfo
 					let !ref = objectHash ty sz (oiData objInfo)
 					let ptr = head $ oiChains objInfo -- it's safe since deltas always have a non empty valid chain
@@ -109,7 +109,7 @@ catFile ty ref git = do
 		"tree"   -> Just TypeTree
 		"-t"     -> Nothing
 		_        -> error "unknown type request"
-	mobj <- findObjectRaw git ref True
+	mobj <- getObjectRaw git ref True
 	case mobj of
 		Nothing  -> error "not a valid object"
 		Just obj ->
@@ -136,7 +136,7 @@ revList revision git = do
 	ref <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
 	loopTillEmpty ref
 	where loopTillEmpty ref = do
-		obj <- findCommit git ref
+		obj <- getCommit git ref
 		case obj of
 			Just (Commit _ parents _ _ _) -> do
 				putStrLn $ show ref

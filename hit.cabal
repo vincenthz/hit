@@ -38,7 +38,8 @@ Library
                    , zlib-bindings >= 0.1 && < 0.2
                    , bytedump
                    , time
-  Exposed-modules:   Data.Git.Types
+  Exposed-modules:   Data.Git
+                     Data.Git.Types
                      Data.Git.Storage
                      Data.Git.Storage.PackIndex
                      Data.Git.Storage.Pack

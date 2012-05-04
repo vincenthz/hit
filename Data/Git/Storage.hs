@@ -36,7 +36,7 @@ import Control.Exception
 import qualified Control.Exception as E
 import Control.Monad
 
-import Data.List ((\\), find, isPrefixOf)
+import Data.List ((\\), isPrefixOf)
 import Data.IORef
 import Data.Word
 
@@ -259,9 +259,9 @@ getObjectAt git loc resolveDelta = maybe Nothing toObject <$> getObjectRawAt git
 
 -- | get an object from repository using a ref.
 getObject :: Git               -- ^ repository
-           -> Ref               -- ^ the object's reference to
-           -> Bool              -- ^ whether to resolve deltas if found
-           -> IO (Maybe Object) -- ^ returned object if found
+          -> Ref               -- ^ the object's reference to
+          -> Bool              -- ^ whether to resolve deltas if found
+          -> IO (Maybe Object) -- ^ returned object if found
 getObject git ref resolveDelta = maybe Nothing toObject <$> getObjectRaw git ref resolveDelta
         where
                 toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
