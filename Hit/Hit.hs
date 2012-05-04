@@ -15,6 +15,7 @@ import Data.IORef
 import Data.Maybe
 import Data.Git.Storage.Pack
 import Data.Git.Storage.Object
+import Data.Git.Storage
 import Data.Git.Types
 import Data.Git.Ref
 import Data.Git.Repository
@@ -148,14 +149,13 @@ revList revision git = do
 			Nothing -> error "reference in commit chain doesn't exists"
 
 main = do
-	p    <- findRepo
 	args <- getArgs
 	case args of
-		["verify-pack",ref]  -> withRepo p $ verifyPack (fromHexString ref)
-		["cat-file",ty,ref]  -> withRepo p $ catFile ty (fromHexString ref)
-		["ls-tree",rev]      -> withRepo p $ lsTree (revFromString rev) ""
-		["ls-tree",rev,path] -> withRepo p $ lsTree (revFromString rev) path
-		["rev-list",rev]     -> withRepo p $ revList (revFromString rev)
+		["verify-pack",ref]  -> withCurrentRepo $ verifyPack (fromHexString ref)
+		["cat-file",ty,ref]  -> withCurrentRepo $ catFile ty (fromHexString ref)
+		["ls-tree",rev]      -> withCurrentRepo $ lsTree (revFromString rev) ""
+		["ls-tree",rev,path] -> withCurrentRepo $ lsTree (revFromString rev) path
+		["rev-list",rev]     -> withCurrentRepo $ revList (revFromString rev)
 		cmd : [] -> error ("unknown command: " ++ cmd)
 		[]       -> error "no args"
 		_        -> error "unknown command line arguments"

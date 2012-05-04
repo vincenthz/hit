@@ -10,6 +10,7 @@ import Control.Monad
 
 import Data.Git.Storage.Object
 import Data.Git.Storage.Loose
+import Data.Git.Storage
 import Data.Git.Ref
 import Data.Git.Types
 import Data.Git.Repository
@@ -22,7 +23,7 @@ import Data.Maybe
 import Text.Bytedump
 import System.Exit
 
-onLocalRepo f = findRepo >>= \repo -> withRepo repo f
+onLocalRepo f = withCurrentRepo f
 
 doLocalMarshallEq git = do
      prefixes <- looseEnumeratePrefixes (gitRepoPath git)

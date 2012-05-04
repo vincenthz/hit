@@ -1,0 +1,270 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+-- |
+-- Module      : Data.Git.Storage
+-- License     : BSD-style
+-- Maintainer  : Vincent Hanquez <vincent@snarc.org>
+-- Stability   : experimental
+-- Portability : unix
+--
+
+module Data.Git.Storage
+    ( Git
+    , gitRepoPath
+    , openRepo
+    , closeRepo
+    , withRepo
+    , withCurrentRepo
+    , findRepo
+    , isRepo
+    , initRepo
+    , iterateIndexes
+    , findReference
+    , findReferencesWithPrefix
+    , findObjectRaw
+    , findObjectRawAt
+    , findObject
+    , findObjectAt
+    , findObjectType
+    ) where
+
+import System.Directory
+import System.FilePath
+import System.Environment
+
+import Control.Applicative ((<$>))
+import Control.Exception
+import qualified Control.Exception as E
+import Control.Monad
+
+import Data.List ((\\), find, isPrefixOf)
+import Data.IORef
+import Data.Word
+
+import Data.Git.Delta
+import Data.Git.Storage.FileReader
+import Data.Git.Storage.PackIndex
+import Data.Git.Storage.Object
+import Data.Git.Storage.Pack
+import Data.Git.Storage.Loose
+import Data.Git.Revision
+import Data.Git.Ref
+import Data.Git.Types
+
+data PackIndexReader = PackIndexReader PackIndexHeader FileReader
+
+-- | represent an git repo, with possibly already opened filereaders
+-- for indexes and packs
+data Git = Git
+        { gitRepoPath  :: FilePath
+        , indexReaders :: IORef [(Ref, PackIndexReader)]
+        , packReaders  :: IORef [(Ref, FileReader)]
+        }
+
+-- | open a new git repository context
+openRepo :: FilePath -> IO Git
+openRepo path = liftM2 (Git path) (newIORef []) (newIORef [])
+
+-- | close a git repository context, closing all remaining fileReaders.
+closeRepo :: Git -> IO ()
+closeRepo (Git { indexReaders = ireaders, packReaders = preaders }) = do
+        mapM_ (closeIndexReader . snd) =<< readIORef ireaders
+        mapM_ (fileReaderClose . snd) =<< readIORef preaders
+        where closeIndexReader (PackIndexReader _ fr) = fileReaderClose fr
+
+-- | Find the git repository from the current directory.
+--
+-- If the environment variable GIT_DIR is set then it's used,
+-- otherwise iterate from current directory, up to 128 parents for a .git directory
+findRepo :: IO FilePath
+findRepo = do
+        menvDir <- E.catch (Just <$> getEnv "GIT_DIR") (\(_:: SomeException) -> return Nothing)
+        case menvDir of
+                Nothing     -> checkDir 0
+                Just envDir -> do
+                        e <- isRepo envDir
+                        when (not e) $ error "environment GIT_DIR is not a git repository" 
+                        return envDir
+        where
+                checkDir 128 = error "not a git repository"
+                checkDir n   = do
+                        let filepath = concat (replicate n ("../") ++ [".git"])
+                        e <- isRepo filepath
+                        if e then return filepath else checkDir (n+1)
+
+-- | execute a function f with a git context.
+withRepo path f = bracket (openRepo path) closeRepo f
+
+-- | execute a function on the current repository.
+--
+-- check findRepo to see how the git repository is found.
+withCurrentRepo :: (Git -> IO a) -> IO a
+withCurrentRepo f = findRepo >>= \path -> withRepo path f
+
+-- | basic checks to see if a specific path looks like a git repo.
+isRepo :: FilePath -> IO Bool
+isRepo path = do
+        dir     <- doesDirectoryExist path
+        subDirs <- mapM (doesDirectoryExist . (path </>))
+                ["branches","hooks","info"
+                ,"logs","objects","refs"
+                ,"refs"</>"heads","refs"</>"tags"]
+        return $ and ([dir] ++ subDirs)
+
+-- | initialize a new repository at a specific location.
+initRepo :: FilePath -> IO ()
+initRepo path = do
+        exists <- doesDirectoryExist path
+        when exists $ error "destination directory already exists"
+        createDirectory path
+        mapM_ (createDirectory . (path </>))
+                ["branches","hooks","info"
+                ,"logs","objects","refs"
+                ,"refs"</>"heads","refs"</>"tags"]
+
+iterateIndexes git f initAcc = do
+        allIndexes    <- packIndexEnumerate (gitRepoPath git)
+        readers       <- readIORef (indexReaders git)
+        (a,terminate) <- loop initAcc readers
+        if terminate
+                then return a
+                else readRemainingIndexes a (allIndexes \\ map fst readers)
+        where
+                loop acc []     = return (acc, False)
+                loop acc (r:rs) = do
+                        (nacc, terminate) <- f acc r
+                        if terminate
+                                then return (nacc,True)
+                                else loop nacc rs
+
+                readRemainingIndexes acc []            = return acc
+                readRemainingIndexes acc (idxref:idxs) = do
+                        fr <- packIndexOpen (gitRepoPath git) idxref
+                        idx <- packIndexReadHeader fr
+                        let idxreader = PackIndexReader idx fr
+                        let r = (idxref, idxreader)
+                        modifyIORef (indexReaders git) (\l -> r : l)
+                        (nacc, terminate) <- f acc r
+                        if terminate
+                                then return nacc
+                                else readRemainingIndexes nacc idxs
+
+-- | Get the object location of a specific reference
+findReference :: Git -> Ref -> IO ObjectLocation
+findReference git ref = maybe NotFound id <$> (findLoose `mplusIO` findInIndexes)
+        where
+                findLoose :: IO (Maybe ObjectLocation)
+                findLoose = do
+                        isLoose <- looseExists (gitRepoPath git) ref
+                        if isLoose then return (Just $ Loose ref) else return Nothing
+
+                findInIndexes :: IO (Maybe ObjectLocation)
+                findInIndexes = iterateIndexes git isinIndex Nothing --f -> (a -> IndexReader -> IO (a,Bool)) -> a -> IO a
+
+                isinIndex acc (idxref, (PackIndexReader idxhdr indexreader)) = do
+                        mloc <- packIndexGetReferenceLocation idxhdr indexreader ref
+                        case mloc of
+                                Nothing  -> return (acc, False)
+                                Just loc -> return (Just $ Packed idxref loc, True)
+
+                mplusIO :: IO (Maybe a) -> IO (Maybe a) -> IO (Maybe a)
+                mplusIO f g = f >>= \vopt -> case vopt of
+                        Nothing -> g
+                        Just v  -> return $ Just v
+
+-- | get all the references that start by a specific prefix
+findReferencesWithPrefix :: Git -> String -> IO [Ref]
+findReferencesWithPrefix git pre
+        | invalidLength         = error "not a valid prefix"
+        | not (isHexString pre) = error "reference prefix contains non hexchar"
+        | otherwise             = do
+                looseRefs  <- looseEnumerateWithPrefixFilter (gitRepoPath git) (take 2 pre) matchRef
+                packedRefs <- concat <$> iterateIndexes git idxPrefixMatch []
+                return (looseRefs ++ packedRefs)
+        where
+                -- not very efficient way to do that... will do for now.
+                matchRef ref = pre `isPrefixOf` toHexString ref
+                invalidLength = length pre < 2 || length pre > 39 
+
+                idxPrefixMatch acc (_, (PackIndexReader idxhdr indexreader)) = do
+                        refs <- packIndexGetReferencesWithPrefix idxhdr indexreader pre
+                        return (refs:acc,False)
+
+readRawFromPack :: Git -> Ref -> Word64 -> IO (FileReader, PackedObjectRaw)
+readRawFromPack git pref offset = do
+        readers <- readIORef (packReaders git)
+        reader  <- maybe getDefault return $ lookup pref readers
+        po <- packReadRawAtOffset reader offset
+        return (reader, po)
+    where getDefault = do p <- packOpen (gitRepoPath git) pref
+                          modifyIORef (packReaders git) ((pref, p):)
+                          return p
+
+readFromPack :: Git -> Ref -> Word64 -> Bool -> IO (Maybe ObjectInfo)
+readFromPack git pref o resolveDelta = do
+        (reader, x) <- readRawFromPack git pref o
+        if resolveDelta then resolve reader o x else return $ Just $ generifyHeader x
+        where
+                generifyHeader :: PackedObjectRaw -> ObjectInfo
+                generifyHeader (po, objData) = ObjectInfo { oiHeader = hdr, oiData = objData, oiChains = [] }
+                        where hdr = (poiType po, poiActualSize po, poiExtra po)
+
+                resolve :: FileReader -> Word64 -> PackedObjectRaw -> IO (Maybe ObjectInfo)
+                resolve reader offset (po, objData) = do
+                        case (poiType po, poiExtra po) of
+                                (TypeDeltaOff, Just ptr@(PtrOfs doff)) -> do
+                                        let delta = deltaRead objData
+                                        let noffset = offset - doff
+                                        base <- resolve reader noffset =<< packReadRawAtOffset reader noffset
+                                        return $ addToChain ptr $ applyDelta delta base
+                                (TypeDeltaRef, Just ptr@(PtrRef bref)) -> do
+                                        let delta = deltaRead objData
+                                        base <- findObjectRaw git bref True
+                                        return $ addToChain ptr $ applyDelta delta base
+                                _                                    -> return $ Just $ generifyHeader (po, objData)
+
+                addToChain ptr (Just oi) = Just (oi { oiChains = ptr : oiChains oi })
+                addToChain _   Nothing   = Nothing
+
+                applyDelta :: Maybe Delta -> Maybe ObjectInfo -> Maybe ObjectInfo
+                applyDelta (Just delta@(Delta _ rSize _)) (Just objInfo) = Just $ objInfo
+                        { oiHeader = (\(a,_,c) -> (a,rSize,c)) $ oiHeader objInfo
+                        , oiData   = deltaApply (oiData objInfo) delta
+                        }
+                applyDelta _ _                                      = Nothing
+
+-- | get an object from repository
+findObjectRawAt :: Git -> ObjectLocation -> Bool -> IO (Maybe ObjectInfo)
+findObjectRawAt _   NotFound    _ = return Nothing
+findObjectRawAt git (Loose ref) _ = Just . (\(h,d)-> ObjectInfo h d[]) <$> looseReadRaw (gitRepoPath git) ref
+findObjectRawAt git (Packed pref o) resolveDelta = readFromPack git pref o resolveDelta
+
+-- | get an object from repository
+findObjectRaw :: Git -> Ref -> Bool -> IO (Maybe ObjectInfo)
+findObjectRaw git ref resolveDelta = do
+        loc <- findReference git ref
+        findObjectRawAt git loc resolveDelta
+
+-- | get an object type from repository
+findObjectType :: Git -> Ref -> IO (Maybe ObjectType)
+findObjectType git ref = findReference git ref >>= findObjectTypeAt
+        where
+                findObjectTypeAt NotFound        = return Nothing
+                findObjectTypeAt (Loose _)       = Just . (\(t,_,_) -> t) <$> looseReadHeader (gitRepoPath git) ref
+                findObjectTypeAt (Packed pref o) =
+                        fmap ((\(ty,_,_) -> ty) . oiHeader) <$> readFromPack git pref o True
+
+-- | get an object from repository using a location to reference it.
+findObjectAt :: Git -> ObjectLocation -> Bool -> IO (Maybe Object)
+findObjectAt git loc resolveDelta = maybe Nothing toObject <$> findObjectRawAt git loc resolveDelta
+        where
+                toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
+
+-- | get an object from repository using a ref.
+findObject :: Git               -- ^ repository
+           -> Ref               -- ^ the object's reference to
+           -> Bool              -- ^ whether to resolve deltas if found
+           -> IO (Maybe Object) -- ^ returned object if found
+findObject git ref resolveDelta = maybe Nothing toObject <$> findObjectRaw git ref resolveDelta
+        where
+                toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
+

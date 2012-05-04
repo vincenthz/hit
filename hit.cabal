@@ -39,6 +39,7 @@ Library
                    , bytedump
                    , time
   Exposed-modules:   Data.Git.Types
+                     Data.Git.Storage
                      Data.Git.Storage.PackIndex
                      Data.Git.Storage.Pack
                      Data.Git.Storage.Object
