@@ -38,19 +38,19 @@ Library
                    , zlib-bindings >= 0.1 && < 0.2
                    , bytedump
                    , time
-  Exposed-modules:   Data.Git.PackIndex
-                     Data.Git.Pack
-                     Data.Git.Object
-                     Data.Git.Types
-                     Data.Git.Loose
+  Exposed-modules:   Data.Git.Types
+                     Data.Git.Storage.PackIndex
+                     Data.Git.Storage.Pack
+                     Data.Git.Storage.Object
+                     Data.Git.Storage.Loose
                      Data.Git.Named
                      Data.Git.Delta
                      Data.Git.Ref
                      Data.Git.Revision
                      Data.Git.Repository
   Other-modules:     Data.Git.Internal
-                     Data.Git.FileReader
-                     Data.Git.FileWriter
+                     Data.Git.Storage.FileReader
+                     Data.Git.Storage.FileWriter
                      Data.Git.Path
   ghc-options:       -Wall -fno-warn-missing-signatures
 

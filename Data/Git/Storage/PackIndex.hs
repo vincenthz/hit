@@ -1,12 +1,12 @@
 -- |
--- Module      : Data.Git.PackIndex
+-- Module      : Data.Git.Storage.PackIndex
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unix
 --
 {-# LANGUAGE OverloadedStrings, BangPatterns #-}
-module Data.Git.PackIndex
+module Data.Git.Storage.PackIndex
         ( PackIndexHeader(..)
         , PackIndex(..)
 
@@ -42,7 +42,7 @@ import qualified Data.Vector as V
 import qualified Data.Attoparsec as A
 
 import Data.Git.Internal
-import Data.Git.FileReader
+import Data.Git.Storage.FileReader
 import Data.Git.Path
 import Data.Git.Ref
 

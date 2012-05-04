@@ -1,11 +1,11 @@
 -- |
--- Module      : Data.Git.FileReader
+-- Module      : Data.Git.Storage.FileReader
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unix
 --
-module Data.Git.FileReader
+module Data.Git.Storage.FileReader
         ( FileReader
         , fileReaderNew
         , fileReaderClose

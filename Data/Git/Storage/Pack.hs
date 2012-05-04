@@ -1,11 +1,11 @@
 -- |
--- Module      : Data.Git.Pack
+-- Module      : Data.Git.Storage.Pack
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unix
 --
-module Data.Git.Pack
+module Data.Git.Storage.Pack
         ( PackedObjectInfo(..)
         , PackedObjectRaw
         -- * Enumerators of packs
@@ -42,11 +42,11 @@ import qualified Data.Attoparsec.Lazy as AL
 
 import Data.Git.Internal
 import Data.Git.Path
-import Data.Git.Object
+import Data.Git.Storage.Object
 import Data.Git.Delta
 import Data.Git.Ref
 import Data.Git.Types
-import Data.Git.FileReader
+import Data.Git.Storage.FileReader
 
 import Data.Word
 

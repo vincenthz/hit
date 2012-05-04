@@ -8,8 +8,8 @@ import qualified Data.ByteString as B
 import Control.Applicative
 import Control.Monad
 
-import Data.Git.Object
-import Data.Git.Loose
+import Data.Git.Storage.Object
+import Data.Git.Storage.Loose
 import Data.Git.Ref
 import Data.Git.Types
 import Data.Time.LocalTime

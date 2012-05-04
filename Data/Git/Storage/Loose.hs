@@ -1,12 +1,12 @@
 -- |
--- Module      : Data.Git.Loose
+-- Module      : Data.Git.Storage.Loose
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unix
 --
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
-module Data.Git.Loose
+module Data.Git.Storage.Loose
         (
         -- * marshall from and to lazy bytestring
           looseUnmarshall
@@ -29,8 +29,8 @@ module Data.Git.Loose
 import Codec.Compression.Zlib
 import Data.Git.Ref
 import Data.Git.Path
-import Data.Git.FileWriter
-import Data.Git.Object
+import Data.Git.Storage.FileWriter
+import Data.Git.Storage.Object
 
 import System.FilePath
 import System.Directory

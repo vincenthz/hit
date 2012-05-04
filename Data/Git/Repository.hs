@@ -50,14 +50,14 @@ import Data.List ((\\), find, isPrefixOf)
 import Data.ByteString (ByteString)
 
 import Data.Git.Delta
-import Data.Git.FileReader
-import Data.Git.PackIndex
-import Data.Git.Pack
+import Data.Git.Storage.FileReader
+import Data.Git.Storage.PackIndex
+import Data.Git.Storage.Pack
 import Data.Git.Named
 import Data.Git.Types
-import Data.Git.Object
+import Data.Git.Storage.Object
 import Data.Git.Revision
-import Data.Git.Loose
+import Data.Git.Storage.Loose
 import Data.Git.Ref
 
 data PackIndexReader = PackIndexReader PackIndexHeader FileReader

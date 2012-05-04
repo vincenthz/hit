@@ -13,8 +13,8 @@ import Control.Applicative ((<$>))
 import Control.Monad
 import Data.IORef
 import Data.Maybe
-import Data.Git.Pack
-import Data.Git.Object
+import Data.Git.Storage.Pack
+import Data.Git.Storage.Object
 import Data.Git.Types
 import Data.Git.Ref
 import Data.Git.Repository

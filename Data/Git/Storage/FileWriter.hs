@@ -1,11 +1,11 @@
 -- |
--- Module      : Data.Git.FileWriter
+-- Module      : Data.Git.Storage.FileWriter
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unix
 --
-module Data.Git.FileWriter where
+module Data.Git.Storage.FileWriter where
 
 import Data.Git.Ref
 import Data.IORef

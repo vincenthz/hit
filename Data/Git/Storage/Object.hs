@@ -1,13 +1,13 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- |
--- Module      : Data.Git.Object
+-- Module      : Data.Git.Storage.Object
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unix
 --
-module Data.Git.Object
+module Data.Git.Storage.Object
         ( ObjectLocation(..)
         , ObjectType(..)
         , ObjectHeader
