@@ -1,5 +1,5 @@
 -- |
--- Module      : Data.Git.Delta
+-- Module      : Data.Git.Revision
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
