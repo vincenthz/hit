@@ -20,11 +20,11 @@ module Data.Git.Storage
     , iterateIndexes
     , findReference
     , findReferencesWithPrefix
-    , findObjectRaw
-    , findObjectRawAt
-    , findObject
-    , findObjectAt
-    , findObjectType
+    , getObjectRaw
+    , getObjectRawAt
+    , getObject
+    , getObjectAt
+    , getObjectType
     ) where
 
 import System.Directory
@@ -46,9 +46,7 @@ import Data.Git.Storage.PackIndex
 import Data.Git.Storage.Object
 import Data.Git.Storage.Pack
 import Data.Git.Storage.Loose
-import Data.Git.Revision
 import Data.Git.Ref
-import Data.Git.Types
 
 data PackIndexReader = PackIndexReader PackIndexHeader FileReader
 
@@ -218,7 +216,7 @@ readFromPack git pref o resolveDelta = do
                                         return $ addToChain ptr $ applyDelta delta base
                                 (TypeDeltaRef, Just ptr@(PtrRef bref)) -> do
                                         let delta = deltaRead objData
-                                        base <- findObjectRaw git bref True
+                                        base <- getObjectRaw git bref True
                                         return $ addToChain ptr $ applyDelta delta base
                                 _                                    -> return $ Just $ generifyHeader (po, objData)
 
@@ -233,38 +231,38 @@ readFromPack git pref o resolveDelta = do
                 applyDelta _ _                                      = Nothing
 
 -- | get an object from repository
-findObjectRawAt :: Git -> ObjectLocation -> Bool -> IO (Maybe ObjectInfo)
-findObjectRawAt _   NotFound    _ = return Nothing
-findObjectRawAt git (Loose ref) _ = Just . (\(h,d)-> ObjectInfo h d[]) <$> looseReadRaw (gitRepoPath git) ref
-findObjectRawAt git (Packed pref o) resolveDelta = readFromPack git pref o resolveDelta
+getObjectRawAt :: Git -> ObjectLocation -> Bool -> IO (Maybe ObjectInfo)
+getObjectRawAt _   NotFound    _ = return Nothing
+getObjectRawAt git (Loose ref) _ = Just . (\(h,d)-> ObjectInfo h d[]) <$> looseReadRaw (gitRepoPath git) ref
+getObjectRawAt git (Packed pref o) resolveDelta = readFromPack git pref o resolveDelta
 
 -- | get an object from repository
-findObjectRaw :: Git -> Ref -> Bool -> IO (Maybe ObjectInfo)
-findObjectRaw git ref resolveDelta = do
+getObjectRaw :: Git -> Ref -> Bool -> IO (Maybe ObjectInfo)
+getObjectRaw git ref resolveDelta = do
         loc <- findReference git ref
-        findObjectRawAt git loc resolveDelta
+        getObjectRawAt git loc resolveDelta
 
 -- | get an object type from repository
-findObjectType :: Git -> Ref -> IO (Maybe ObjectType)
-findObjectType git ref = findReference git ref >>= findObjectTypeAt
+getObjectType :: Git -> Ref -> IO (Maybe ObjectType)
+getObjectType git ref = findReference git ref >>= getObjectTypeAt
         where
-                findObjectTypeAt NotFound        = return Nothing
-                findObjectTypeAt (Loose _)       = Just . (\(t,_,_) -> t) <$> looseReadHeader (gitRepoPath git) ref
-                findObjectTypeAt (Packed pref o) =
+                getObjectTypeAt NotFound        = return Nothing
+                getObjectTypeAt (Loose _)       = Just . (\(t,_,_) -> t) <$> looseReadHeader (gitRepoPath git) ref
+                getObjectTypeAt (Packed pref o) =
                         fmap ((\(ty,_,_) -> ty) . oiHeader) <$> readFromPack git pref o True
 
 -- | get an object from repository using a location to reference it.
-findObjectAt :: Git -> ObjectLocation -> Bool -> IO (Maybe Object)
-findObjectAt git loc resolveDelta = maybe Nothing toObject <$> findObjectRawAt git loc resolveDelta
+getObjectAt :: Git -> ObjectLocation -> Bool -> IO (Maybe Object)
+getObjectAt git loc resolveDelta = maybe Nothing toObject <$> getObjectRawAt git loc resolveDelta
         where
                 toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 
 -- | get an object from repository using a ref.
-findObject :: Git               -- ^ repository
+getObject :: Git               -- ^ repository
            -> Ref               -- ^ the object's reference to
            -> Bool              -- ^ whether to resolve deltas if found
            -> IO (Maybe Object) -- ^ returned object if found
-findObject git ref resolveDelta = maybe Nothing toObject <$> findObjectRaw git ref resolveDelta
+getObject git ref resolveDelta = maybe Nothing toObject <$> getObjectRaw git ref resolveDelta
         where
                 toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 

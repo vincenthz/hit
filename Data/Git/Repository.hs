@@ -11,9 +11,8 @@ module Data.Git.Repository
         ( Git
         , HTree
         , HTreeEnt(..)
-        , findCommit
-        , findTree
-        , findObjectAt
+        , getCommit
+        , getTree
         , rewrite
         , buildHTree
         , resolvePath
@@ -23,26 +22,14 @@ module Data.Git.Repository
         , isRepo
         ) where
 
-import System.Directory
-import System.FilePath
-import System.Environment
-
 import Control.Applicative ((<$>))
-import Control.Exception
-import qualified Control.Exception as E
 import Control.Monad
 
-import Data.Word
 import Data.Maybe (fromMaybe)
-import Data.IORef
-import Data.List ((\\), find, isPrefixOf)
+import Data.List (find)
 
 import Data.ByteString (ByteString)
 
-import Data.Git.Delta
-import Data.Git.Storage.FileReader
-import Data.Git.Storage.PackIndex
-import Data.Git.Storage.Pack
 import Data.Git.Named
 import Data.Git.Types
 import Data.Git.Storage.Object
@@ -59,16 +46,16 @@ type HTree = [(Int,ByteString,HTreeEnt)]
 mapJustM f (Just o) = f o
 mapJustM _ Nothing  = return Nothing
 
--- | find a specified commit
-findCommit :: Git -> Ref -> IO (Maybe Commit)
-findCommit git ref = findObject git ref True >>= mapJustM unwrap
+-- | get a specified commit
+getCommit :: Git -> Ref -> IO (Maybe Commit)
+getCommit git ref = getObject git ref True >>= mapJustM unwrap
         where
                 unwrap (objectToCommit -> Just c@(Commit _ _ _ _ _)) = return $ Just c
                 unwrap _                                             = return Nothing
 
--- | find a specified tree
-findTree :: Git -> Ref -> IO (Maybe Tree)
-findTree git ref = findObject git ref True >>= mapJustM unwrap
+-- | get a specified tree
+getTree :: Git -> Ref -> IO (Maybe Tree)
+getTree git ref = getObject git ref True >>= mapJustM unwrap
         where
                 unwrap (objectToTree -> Just c@(Tree _ )) = return $ Just c
                 unwrap _                                  = return Nothing
@@ -114,14 +101,14 @@ resolveRevision git (Revision prefix modifiers) = resolvePrefix >>= modf modifie
                 modf (_:_) _ = error "unimplemented revision modifier"
 
                 getParentRefs ref = do
-                        obj <- findCommit git ref
+                        obj <- getCommit git ref
                         case obj of
                                 Just (Commit _ parents _ _ _) -> return parents
                                 Nothing -> error "reference in commit chain doesn't exists"
 
 -- | returns a tree from a ref that might be either a commit, a tree or a tag.
 resolveTreeish :: Git -> Ref -> IO (Maybe Tree)
-resolveTreeish git ref = findObject git ref True >>= mapJustM recToTree where
+resolveTreeish git ref = getObject git ref True >>= mapJustM recToTree where
         recToTree (objectToCommit -> Just (Commit tree _ _ _ _)) = resolveTreeish git tree
         recToTree (objectToTag    -> Just (Tag tref _ _ _ _))    = resolveTreeish git tref
         recToTree (objectToTree   -> Just t@(Tree _))            = return $ Just t
@@ -151,8 +138,8 @@ rewrite git mapCommit revision nbParent = do
     resolveParents nbParent ref >>= process . reverse
 
     where resolveParents :: Int -> Ref -> IO [ (Ref, Commit) ]
-          resolveParents 0 ref = (:[]) . (,) ref . fromMaybe (error "commit cannot be found") <$> findCommit git ref
-          resolveParents n ref = do commit <- fromMaybe (error "commit cannot be found") <$> findCommit git ref
+          resolveParents 0 ref = (:[]) . (,) ref . fromMaybe (error "commit cannot be found") <$> getCommit git ref
+          resolveParents n ref = do commit <- fromMaybe (error "commit cannot be found") <$> getCommit git ref
                                     case commitParents commit of
                                          [parentRef] -> liftM ((ref,commit) :) (resolveParents (n-1) parentRef)
                                          _           -> return [(ref,commit)]
@@ -171,11 +158,11 @@ rewrite git mapCommit revision nbParent = do
 buildHTree :: Git -> Tree -> IO HTree
 buildHTree git (Tree ents) = mapM resolveTree ents
         where resolveTree (perm, ent, ref) = do
-                obj <- findObjectType git ref
+                obj <- getObjectType git ref
                 case obj of
                         Just TypeBlob -> return (perm, ent, TreeFile ref)
                         Just TypeTree -> do
-                                ctree <- findTree git ref
+                                ctree <- getTree git ref
                                 case ctree of
                                         Nothing -> error "unknown reference in tree object: no such child"
                                         Just t  -> do
@@ -190,7 +177,7 @@ resolvePath :: Git            -- ^ repository
             -> [ByteString]   -- ^ paths
             -> IO (Maybe Ref)
 resolvePath git commitRef paths = do
-        commit <- findCommit git commitRef
+        commit <- getCommit git commitRef
         case commit of
                 Just (Commit tree _ _ _ _) -> resolve tree paths
                 Nothing                    -> error ("not a valid commit ref: " ++ show commitRef)
@@ -198,7 +185,7 @@ resolvePath git commitRef paths = do
                 resolve :: Ref -> [ByteString] -> IO (Maybe Ref)
                 resolve treeRef []     = return $ Just treeRef
                 resolve treeRef (x:xs) = do
-                        tree <- findTree git treeRef
+                        tree <- getTree git treeRef
                         case tree of
                                 Just (Tree ents) -> do
                                         let cEnt = treeEntRef <$> findEnt x ents
