@@ -8,10 +8,11 @@
 module Data.Git.Revision
         ( Revision(..)
         , RevModifier(..)
-        , revFromString
+        , fromString
         ) where
 
 import Text.Parsec
+import Data.String
 
 data RevModifier =
           RevModParent Int       -- ^ parent accessor ^<n> and ^
@@ -23,6 +24,9 @@ data RevModifier =
 
 data Revision = Revision String [RevModifier]
         deriving (Eq)
+
+instance IsString Revision where
+    fromString = revFromString
 
 revFromString s = either (error.show) id $ parse parser "" s where
         parser = do

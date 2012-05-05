@@ -153,9 +153,9 @@ main = do
 	case args of
 		["verify-pack",ref]  -> withCurrentRepo $ verifyPack (fromHexString ref)
 		["cat-file",ty,ref]  -> withCurrentRepo $ catFile ty (fromHexString ref)
-		["ls-tree",rev]      -> withCurrentRepo $ lsTree (revFromString rev) ""
-		["ls-tree",rev,path] -> withCurrentRepo $ lsTree (revFromString rev) path
-		["rev-list",rev]     -> withCurrentRepo $ revList (revFromString rev)
+		["ls-tree",rev]      -> withCurrentRepo $ lsTree (fromString rev) ""
+		["ls-tree",rev,path] -> withCurrentRepo $ lsTree (fromString rev) path
+		["rev-list",rev]     -> withCurrentRepo $ revList (fromString rev)
 		cmd : [] -> error ("unknown command: " ++ cmd)
 		[]       -> error "no args"
 		_        -> error "unknown command line arguments"
