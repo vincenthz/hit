@@ -25,6 +25,7 @@ module Data.Git.Storage
     , getObject
     , getObjectAt
     , getObjectType
+    , setObject
     ) where
 
 import System.Directory
@@ -266,3 +267,9 @@ getObject git ref resolveDelta = maybe Nothing toObject <$> getObjectRaw git ref
         where
                 toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 
+-- | set an object in the store and returns the new ref
+-- this is always going to create a loose object.
+setObject :: Git
+          -> Object
+          -> IO Ref
+setObject git obj = looseWrite (gitRepoPath git) obj
