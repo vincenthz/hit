@@ -20,11 +20,13 @@ module Data.Git.Storage
     , iterateIndexes
     , findReference
     , findReferencesWithPrefix
+    -- * getting objects
     , getObjectRaw
     , getObjectRawAt
     , getObject
     , getObjectAt
     , getObjectType
+    -- * setting objects
     , setObject
     ) where
 
