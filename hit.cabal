@@ -59,7 +59,7 @@ Library
 Executable           Hit
   Main-Is:           Hit.hs
   hs-source-dirs:    Hit
-  ghc-options:       -Wall -fno-warn-missing-signatures
+  ghc-options:       -Wall -fno-warn-orphans -fno-warn-missing-signatures
   if flag(debug)
     ghc-options:     -rtsops -auto-all -caf-all
   if flag(executable)
