@@ -47,3 +47,4 @@ import Data.Git.Ref
 import Data.Git.Types
 import Data.Git.Storage
 import Data.Git.Repository
+import Data.Git.Revision

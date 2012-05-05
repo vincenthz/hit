@@ -7,13 +7,13 @@
 -- Portability : unix
 --
 module Data.Git.Named
-        ( headList
+        ( headsList
         , headExists
         , headRead
         , headWrite
         , remotesList
         , remoteList
-        , tagList
+        , tagsList
         , tagExists
         , tagRead
         , tagWrite
@@ -34,8 +34,8 @@ import qualified Data.ByteString.Char8 as BC
 getDirectoryContentNoDots path = filter noDot <$> getDirectoryContents path
         where noDot = (not . isPrefixOf ".")
 
-headList gitRepo = getDirectoryContentNoDots (headsPath gitRepo)
-tagList gitRepo = getDirectoryContentNoDots (tagsPath gitRepo)
+headsList gitRepo = getDirectoryContentNoDots (headsPath gitRepo)
+tagsList gitRepo = getDirectoryContentNoDots (tagsPath gitRepo)
 remotesList gitRepo = getDirectoryContentNoDots (remotesPath gitRepo)
 remoteList gitRepo remote = getDirectoryContentNoDots (remotePath gitRepo remote)
 
