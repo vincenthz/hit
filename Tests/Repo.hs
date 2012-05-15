@@ -27,7 +27,6 @@ onLocalRepo f = withCurrentRepo f
 
 doLocalMarshallEq git = do
      prefixes <- looseEnumeratePrefixes (gitRepoPath git)
-     {-map fst . filter ((== False) . snd) . concat <$>-}
      forM prefixes $ \prefix -> do
          refs <- looseEnumerateWithPrefix (gitRepoPath git) prefix
          forM refs $ \ref -> do
