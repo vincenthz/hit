@@ -36,7 +36,6 @@ Library
                    , random
                    , zlib
                    , zlib-bindings >= 0.1 && < 0.2
-                   , bytedump
                    , time
   Exposed-modules:   Data.Git
                      Data.Git.Types
@@ -73,7 +72,6 @@ Executable           Hit
                    , parsec     >= 3
                    , filepath
                    , directory
-                   , bytedump
                    , hit
     Buildable: True
   else
@@ -103,7 +101,7 @@ Test-Suite test-repository
                    , test-framework >= 0.3
                    , test-framework-quickcheck2 >= 0.2
                    , time
-                   , bytedump
+                   , bytedump >= 1.0
                    , hit
 
 source-repository head
