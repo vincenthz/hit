@@ -5,6 +5,7 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+{-# LANGUAGE DeriveDataTypeable #-}
 module Data.Git.Storage.FileReader
         ( FileReader
         , fileReaderNew
@@ -37,11 +38,13 @@ import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Lazy.Internal (defaultChunkSize)
 import Data.IORef
 
+import Data.Data
 import Data.Word
 
 import Codec.Zlib
 import Codec.Zlib.Lowlevel
 import Foreign.ForeignPtr
+import qualified Control.Exception as E
 
 import System.IO
 
@@ -52,6 +55,11 @@ data FileReader = FileReader
         , fbRemaining  :: IORef ByteString
         , fbPos        :: IORef Word64
         }
+
+data InflateException = InflateException Word64 Word64 String
+    deriving (Show,Eq,Typeable)
+
+instance E.Exception InflateException
 
 fileReaderNew :: Bool -> Handle -> IO FileReader
 fileReaderNew decompress handle = do
@@ -149,11 +157,14 @@ fileReaderInflateToSize fb@(FileReader { fbRemaining = ref }) outputSize = do
                 let maxToInflate = min left (16 * 1024)
                 let lastBlock = if left == maxToInflate then True else False
                 (dbs,remaining) <- inflateToSize inflate (fromIntegral maxToInflate) lastBlock rbs (fileReaderGetNext fb)
+                                   `E.catch` augmentAndRaise left
                 writeIORef ref remaining
                 let nleft = left - fromIntegral (B.length dbs)
                 if nleft > 0
                         then liftM (dbs:) (loop inflate nleft)
                         else return [dbs]
+              augmentAndRaise :: Word64 -> E.SomeException -> IO a
+              augmentAndRaise left exn = throwIO $ InflateException outputSize left (show exn)
 
 -- lowlevel helpers to inflate only to a specific size.
 
