@@ -6,13 +6,19 @@
 -- Portability : unix
 --
 module Data.Git.Internal
-        ( be32
-        , be16
-        ) where
+    ( be32
+    , be16
+    , Zipped(..)
+    , readZippedFile
+    , dezip
+    ) where
 
+import Control.Applicative
 import Data.Bits
 import Data.Word
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as L
+import Codec.Compression.Zlib
 
 be32 :: B.ByteString -> Word32
 be32 b = fromIntegral (B.index b 0) `shiftL` 24
@@ -23,3 +29,12 @@ be32 b = fromIntegral (B.index b 0) `shiftL` 24
 be16 :: B.ByteString -> Word16
 be16 b = fromIntegral (B.index b 0) `shiftL` 8
        + fromIntegral (B.index b 1)
+
+newtype Zipped = Zipped { getZippedData :: L.ByteString }
+    deriving (Show,Eq)
+
+readZippedFile :: FilePath -> IO Zipped
+readZippedFile fp = Zipped <$> L.readFile fp
+
+dezip :: Zipped -> L.ByteString
+dezip = decompress . getZippedData

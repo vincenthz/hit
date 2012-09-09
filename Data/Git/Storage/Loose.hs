@@ -5,12 +5,15 @@
 -- Stability   : experimental
 -- Portability : unix
 --
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, ViewPatterns #-}
 module Data.Git.Storage.Loose
         (
+          Zipped(..)
         -- * marshall from and to lazy bytestring
-          looseUnmarshall
+        , looseUnmarshall
         , looseUnmarshallRaw
+        , looseUnmarshallZipped
+        , looseUnmarshallZippedRaw
         , looseMarshall
         -- * read and check object existence
         , looseRead
@@ -29,6 +32,7 @@ module Data.Git.Storage.Loose
 import Codec.Compression.Zlib
 import Data.Git.Ref
 import Data.Git.Path
+import Data.Git.Internal
 import Data.Git.Storage.FileWriter
 import Data.Git.Storage.Object
 
@@ -75,32 +79,38 @@ parseObject :: L.ByteString -> Object
 parseObject = parseSuccess (parseTree <|> parseBlob <|> parseCommit <|> parseTag)
         where parseSuccess p = either error id . eitherResult . parse p
 
--- | unmarshall an object (with header) from a lazy bytestring.
+-- | unmarshall an object (with header) from a bytestring.
 looseUnmarshall :: L.ByteString -> Object
-looseUnmarshall = parseObject . decompress
+looseUnmarshall = parseObject
 
--- | unmarshall an object as (header, data) tuple from a lazy bytestring.
+-- | unmarshall an object (with header) from a zipped stream.
+looseUnmarshallZipped :: Zipped -> Object
+looseUnmarshallZipped = parseObject . dezip
+
+-- | unmarshall an object as (header, data) tuple from a bytestring
 looseUnmarshallRaw :: L.ByteString -> (ObjectHeader, ObjectData)
-looseUnmarshallRaw l =
-        let dl = decompress l in
-        let i = L.findIndex ((==) 0) dl in
-        case i of
+looseUnmarshallRaw stream =
+        case L.findIndex ((==) 0) stream of
                 Nothing  -> error "object not right format. missing 0"
                 Just idx ->
-                        let (h, r) = L.splitAt (idx+1) dl in
+                        let (h, r) = L.splitAt (idx+1) stream in
                         case maybeResult $ parse parseHeader h of
                                 Nothing  -> error "cannot open object"
                                 Just hdr -> (hdr, r)
 
+-- | unmarshall an object as (header, data) tuple from a zipped stream
+looseUnmarshallZippedRaw :: Zipped -> (ObjectHeader, ObjectData)
+looseUnmarshallZippedRaw = looseUnmarshallRaw . dezip
+
 -- | read a specific ref from a loose object and returns an header and data.
-looseReadRaw repoPath ref = looseUnmarshallRaw <$> L.readFile (objectPathOfRef repoPath ref)
+looseReadRaw repoPath ref = looseUnmarshallZippedRaw <$> readZippedFile (objectPathOfRef repoPath ref)
 
 -- | read only the header of a loose object.
-looseReadHeader repoPath ref = toHeader <$> L.readFile (objectPathOfRef repoPath ref)
-        where toHeader = either error id . eitherResult . parse parseHeader . decompress
+looseReadHeader repoPath ref = toHeader <$> readZippedFile (objectPathOfRef repoPath ref)
+        where toHeader = either error id . eitherResult . parse parseHeader . dezip
 
 -- | read a specific ref from a loose object and returns an object
-looseRead repoPath ref = looseUnmarshall <$> L.readFile (objectPathOfRef repoPath ref)
+looseRead repoPath ref = looseUnmarshallZipped <$> readZippedFile (objectPathOfRef repoPath ref)
 
 -- | check if a specific ref exists as loose object
 looseExists repoPath ref = doesFileExist (objectPathOfRef repoPath ref)
