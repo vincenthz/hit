@@ -31,6 +31,15 @@ import Data.List (isPrefixOf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+-- | Represent a named ref type.
+data RefTy = RefTyHead String
+           | RefTyTag String
+           | RefTyRemote String
+           | RefTyPatches String
+           | RefTyStash
+           | RefTyOther String
+           deriving (Show,Eq,Ord)
+
 -- FIXME BC.unpack/pack should be probably be utf8.toString,
 -- however i don't know if encoding is consistant.
 -- it should probably be overridable.
@@ -40,8 +49,32 @@ pathDecode = BC.unpack
 pathEncode :: FilePath -> B.ByteString
 pathEncode = BC.pack
 
+toRefTy :: B.ByteString -> RefTy
+toRefTy s
+    | "refs/tags/" `BC.isPrefixOf` s    = RefTyTag $ pathDecode $ B.drop 10 s
+    | "refs/heads/" `BC.isPrefixOf` s   = RefTyHead $ pathDecode $ B.drop 11 s
+    | "refs/remotes/" `BC.isPrefixOf` s = RefTyRemote $ pathDecode $ B.drop 13 s
+    | "refs/patches/" `BC.isPrefixOf` s = RefTyPatches $ pathDecode $ B.drop 13 s
+    | "refs/stash" == s                 = RefTyStash
+    | otherwise                         = RefTyOther $ pathDecode $ s
+
+fromRefTy :: RefTy -> B.ByteString
+fromRefTy (RefTyHead h)    = "refs/heads/" `B.append` pathEncode h
+fromRefTy (RefTyTag h)     = "refs/tags/" `B.append` pathEncode h
+fromRefTy (RefTyRemote h)  = "refs/remotes/" `B.append` pathEncode h
+fromRefTy (RefTyPatches h) = "refs/patches/" `B.append` pathEncode h
+fromRefTy RefTyStash       = "refs/stash"
+fromRefTy (RefTyOther h)   = pathEncode h
+
 getDirectoryContentNoDots path = filter noDot <$> getDirectoryContents path
         where noDot = (not . isPrefixOf ".")
+
+readPackedRefs gitRepo = foldl accu [] . BC.lines <$> B.readFile (packedRefsPath gitRepo)
+    where accu a l
+            | "#" `BC.isPrefixOf` l = a
+            | otherwise = let (ref, r) = B.splitAt 40 l
+                              name     = B.tail r
+                           in (fromHex ref, toRefTy name) : a
 
 headsList gitRepo = getDirectoryContentNoDots (headsPath gitRepo)
 tagsList gitRepo = getDirectoryContentNoDots (tagsPath gitRepo)
