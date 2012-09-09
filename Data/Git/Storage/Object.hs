@@ -15,7 +15,7 @@ module Data.Git.Storage.Object
         , ObjectPtr(..)
         , Object(..)
         , ObjectInfo(..)
-        , objectWrap
+        , Objectable(..)
         , objectToType
         , objectTypeMarshall
         , objectTypeUnmarshall
@@ -85,30 +85,30 @@ data ObjectInfo = ObjectInfo
         , oiChains :: [ObjectPtr]
         } deriving (Show,Eq)
 
-class Objectable a where
-        getType :: a -> ObjectType
-        getRaw  :: a -> L.ByteString
-        isDelta :: a -> Bool
-
-        toCommit :: a -> Maybe Commit
-        toCommit = const Nothing
-        toTree   :: a -> Maybe Tree
-        toTree = const Nothing
-        toTag    :: a -> Maybe Tag
-        toTag = const Nothing
-        toBlob   :: a -> Maybe Blob
-        toBlob = const Nothing
-
 -- | describe a git object, that could of 6 differents types:
 -- tree, blob, commit, tag and deltas (offset or ref).
--- the deltas one are only available through packs.
-data Object = forall a . Objectable a => Object a
+-- the deltas one are only available in packs.
+data Object = ObjCommit   Commit
+            | ObjTag      Tag
+            | ObjBlob     Blob
+            | ObjTree     Tree
+            | ObjDeltaOfs DeltaOfs
+            | ObjDeltaRef DeltaRef
+            deriving (Show,Eq)
 
-objectWrap :: Objectable a => a -> Object
-objectWrap a = Object a
+class Objectable a where
+        getType  :: a -> ObjectType
+        getRaw   :: a -> L.ByteString
+        isDelta  :: a -> Bool
+        toObject :: a -> Object
 
 objectToType :: Object -> ObjectType
-objectToType (Object a) = getType a
+objectToType (ObjTree _)     = TypeTree
+objectToType (ObjBlob _)     = TypeBlob
+objectToType (ObjCommit _)   = TypeCommit
+objectToType (ObjTag _)      = TypeTag
+objectToType (ObjDeltaOfs _) = TypeDeltaOff
+objectToType (ObjDeltaRef _) = TypeDeltaRef
 
 objectTypeMarshall :: ObjectType -> String
 objectTypeMarshall TypeTree   = "tree"
@@ -130,19 +130,25 @@ objectTypeIsDelta TypeDeltaRef = True
 objectTypeIsDelta _            = False
 
 objectIsDelta :: Object -> Bool
-objectIsDelta (Object a) = isDelta a
+objectIsDelta (ObjDeltaOfs _) = True
+objectIsDelta (ObjDeltaRef _) = True
+objectIsDelta _               = False
 
 objectToTree :: Object -> Maybe Tree
-objectToTree (Object a) = toTree a
+objectToTree (ObjTree tree) = Just tree
+objectToTree _              = Nothing
 
 objectToCommit :: Object -> Maybe Commit
-objectToCommit (Object a) = toCommit a
+objectToCommit (ObjCommit commit) = Just commit
+objectToCommit _                  = Nothing
 
 objectToTag :: Object -> Maybe Tag
-objectToTag (Object a) = toTag a
+objectToTag (ObjTag tag) = Just tag
+objectToTag _            = Nothing
 
 objectToBlob :: Object -> Maybe Blob
-objectToBlob (Object a) = toBlob a
+objectToBlob (ObjBlob blob) = Just blob
+objectToBlob _              = Nothing
 
 octal :: Parser Int
 octal = B.foldl' step 0 `fmap` takeWhile1 isOct where
@@ -204,17 +210,21 @@ parseName = do
         let tz = minutesToTimeZone (hours*60 + (if hours > 0 then minutes else (-minutes)))
         return (name, email, posixSecondsToUTCTime $ fromIntegral time, tz)
 
-objectParseTree = objectWrap <$> treeParse
-objectParseCommit = objectWrap <$> commitParse
-objectParseTag = objectWrap <$> tagParse
-objectParseBlob = objectWrap <$> blobParse
+objectParseTree   = ObjTree <$> treeParse
+objectParseCommit = ObjCommit <$> commitParse
+objectParseTag    = ObjTag <$> tagParse
+objectParseBlob   = ObjBlob <$> blobParse
 
 -- header of loose objects, but also useful for any object to determine object's hash
 objectWriteHeader :: ObjectType -> Word64 -> ByteString
 objectWriteHeader ty sz = BC.pack (objectTypeMarshall ty ++ " " ++ show sz ++ [ '\0' ])
 
 objectWrite :: Object -> L.ByteString
-objectWrite (Object a) = getRaw a
+objectWrite (ObjCommit commit) = commitWrite commit
+objectWrite (ObjTag tag)       = tagWrite tag
+objectWrite (ObjBlob blob)     = blobWrite blob
+objectWrite (ObjTree tree)     = treeWrite tree
+objectWrite _                  = error "delta cannot be marshalled"
 
 treeWrite (Tree ents) = L.fromChunks $ concat $ map writeTreeEnt ents where
         writeTreeEnt (perm,name,ref) =
@@ -246,35 +256,37 @@ blobWrite (Blob bData) = bData
 instance Objectable Blob where
         getType _ = TypeBlob
         getRaw    = blobWrite
+        toObject  = ObjBlob
         isDelta   = const False
-        toBlob t  = Just t
 
 instance Objectable Commit where
-        getType _  = TypeCommit
-        getRaw     = commitWrite
-        isDelta    = const False
-        toCommit t = Just t
+        getType _ = TypeCommit
+        getRaw    = commitWrite
+        toObject  = ObjCommit
+        isDelta   = const False
 
 instance Objectable Tag where
         getType _ = TypeTag
         getRaw    = tagWrite
+        toObject  = ObjTag
         isDelta   = const False
-        toTag t   = Just t
 
 instance Objectable Tree where
         getType _ = TypeTree
         getRaw    = treeWrite
+        toObject  = ObjTree
         isDelta   = const False
-        toTree t  = Just t
 
 instance Objectable DeltaOfs where
         getType _ = TypeDeltaOff
         getRaw    = error "delta offset cannot be marshalled"
+        toObject  = ObjDeltaOfs
         isDelta   = const True
 
 instance Objectable DeltaRef where
         getType _ = TypeDeltaRef
         getRaw    = error "delta ref cannot be marshalled"
+        toObject  = ObjDeltaRef
         isDelta   = const True
 
 objectHash :: ObjectType -> Word64 -> L.ByteString -> Ref

@@ -256,18 +256,18 @@ getObjectType git ref = findReference git ref >>= getObjectTypeAt
 
 -- | get an object from repository using a location to reference it.
 getObjectAt :: Git -> ObjectLocation -> Bool -> IO (Maybe Object)
-getObjectAt git loc resolveDelta = maybe Nothing toObject <$> getObjectRawAt git loc resolveDelta
+getObjectAt git loc resolveDelta = maybe Nothing toObj <$> getObjectRawAt git loc resolveDelta
         where
-                toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
+                toObj (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 
 -- | get an object from repository using a ref.
 getObject :: Git               -- ^ repository
           -> Ref               -- ^ the object's reference to
           -> Bool              -- ^ whether to resolve deltas if found
           -> IO (Maybe Object) -- ^ returned object if found
-getObject git ref resolveDelta = maybe Nothing toObject <$> getObjectRaw git ref resolveDelta
+getObject git ref resolveDelta = maybe Nothing toObj <$> getObjectRaw git ref resolveDelta
         where
-                toObject (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
+                toObj (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 
 -- | set an object in the store and returns the new ref
 -- this is always going to create a loose object.

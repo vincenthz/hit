@@ -146,12 +146,12 @@ rewrite git mapCommit revision nbParent = do
 
           process [] = error "nothing to rewrite"
           process ((_,commit):next) =
-                      mapCommit commit >>= looseWrite (gitRepoPath git) . objectWrap >>= flip rewriteOne next
+                      mapCommit commit >>= looseWrite (gitRepoPath git) . toObject >>= flip rewriteOne next
 
           rewriteOne prevRef [] = return prevRef
           rewriteOne prevRef ((_,commit):next) = do
                       newCommit <- mapCommit $ commit { commitParents = [prevRef] }
-                      ref       <- looseWrite (gitRepoPath git) (objectWrap newCommit)
+                      ref       <- looseWrite (gitRepoPath git) (toObject newCommit)
                       rewriteOne ref next
 
 -- | build a hierarchy tree from a tree object
