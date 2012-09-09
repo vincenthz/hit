@@ -31,6 +31,15 @@ import Data.List (isPrefixOf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+-- FIXME BC.unpack/pack should be probably be utf8.toString,
+-- however i don't know if encoding is consistant.
+-- it should probably be overridable.
+pathDecode :: B.ByteString -> FilePath
+pathDecode = BC.unpack
+
+pathEncode :: FilePath -> B.ByteString
+pathEncode = BC.pack
+
 getDirectoryContentNoDots path = filter noDot <$> getDirectoryContents path
         where noDot = (not . isPrefixOf ".")
 
@@ -45,8 +54,8 @@ readRef path = fromHex . B.take 40 <$> B.readFile path
 readRefAndFollow gitRepo path = do
         content <- B.readFile path
         if "ref: " `B.isPrefixOf` content
-                then do -- BC.unpack should be utf8.toString, and the whole thing is really fragile. need to do the proper thing.
-                        let file = BC.unpack $ BC.init $ B.drop 5 content
+                then do -- the whole thing is really fragile. need to do the proper thing.
+                        let file = pathDecode $ BC.init $ B.drop 5 content
                         readRefAndFollow gitRepo (gitRepo ++ "/" ++ file)
                 else return (fromHex $ B.take 40 content)
 
