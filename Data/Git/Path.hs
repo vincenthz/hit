@@ -15,6 +15,7 @@ import Data.Git.Ref
 headsPath gitRepo = gitRepo </> "refs" </> "heads"
 tagsPath gitRepo  = gitRepo </> "refs" </> "tags"
 remotesPath gitRepo = gitRepo </> "refs" </> "remotes"
+packedRefsPath gitRepo = gitRepo </> "packed-refs"
 
 headPath gitRepo name = headsPath gitRepo </> name
 tagPath gitRepo name = tagsPath gitRepo </> name
