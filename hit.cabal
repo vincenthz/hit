@@ -37,6 +37,7 @@ Library
                    , zlib
                    , zlib-bindings >= 0.1 && < 0.2
                    , time
+                   , unix
   Exposed-modules:   Data.Git
                      Data.Git.Types
                      Data.Git.Storage
@@ -52,6 +53,7 @@ Library
   Other-modules:     Data.Git.Internal
                      Data.Git.Storage.FileReader
                      Data.Git.Storage.FileWriter
+                     Data.Git.Storage.CacheFile
                      Data.Git.Path
   ghc-options:       -Wall -fno-warn-missing-signatures
 
