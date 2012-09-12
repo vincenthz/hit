@@ -186,8 +186,8 @@ findReference git ref = maybe NotFound id <$> (findLoose `mplusIO` findInIndexes
 -- | get all the references that start by a specific prefix
 findReferencesWithPrefix :: Git -> String -> IO [Ref]
 findReferencesWithPrefix git pre
-        | invalidLength         = error "not a valid prefix"
-        | not (isHexString pre) = error "reference prefix contains non hexchar"
+        | invalidLength         = error ("not a valid prefix: " ++ show pre)
+        | not (isHexString pre) = error ("reference prefix contains non hexchar: " ++ show pre)
         | otherwise             = do
                 looseRefs  <- looseEnumerateWithPrefixFilter (gitRepoPath git) (take 2 pre) matchRef
                 packedRefs <- concat <$> iterateIndexes git idxPrefixMatch []

@@ -146,7 +146,7 @@ revList revision git = do
 				case parents of
 					[]    -> return ()
 					(p:_) -> loopTillEmpty p
-			Nothing -> error "reference in commit chain doesn't exists"
+			Nothing -> error ("commit reference " ++ show ref ++ " in commit chain doesn't exists")
 
 main = do
 	args <- getArgs
