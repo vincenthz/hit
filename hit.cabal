@@ -29,6 +29,7 @@ Library
                    , bytestring
                    , attoparsec >= 0.10.1
                    , parsec     >= 3
+                   , containers
                    , filepath
                    , directory
                    , cryptohash

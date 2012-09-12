@@ -9,6 +9,7 @@
 
 module Data.Git.Storage
     ( Git
+    , packedNamed
     , gitRepoPath
     , openRepo
     , closeRepo
@@ -43,15 +44,23 @@ import Data.List ((\\), isPrefixOf)
 import Data.IORef
 import Data.Word
 
+import Data.Git.Named
+import Data.Git.Path (packedRefsPath)
 import Data.Git.Delta
 import Data.Git.Storage.FileReader
 import Data.Git.Storage.PackIndex
 import Data.Git.Storage.Object
 import Data.Git.Storage.Pack
 import Data.Git.Storage.Loose
+import Data.Git.Storage.CacheFile
 import Data.Git.Ref
 
+import qualified Data.Map as M
+
 data PackIndexReader = PackIndexReader PackIndexHeader FileReader
+
+-- | this is a cache representation of the packed-ref file
+type PackedRef = CacheFile (M.Map RefSpecTy Ref)
 
 -- | represent an git repo, with possibly already opened filereaders
 -- for indexes and packs
@@ -59,11 +68,13 @@ data Git = Git
         { gitRepoPath  :: FilePath
         , indexReaders :: IORef [(Ref, PackIndexReader)]
         , packReaders  :: IORef [(Ref, FileReader)]
+        , packedNamed  :: PackedRef
         }
 
 -- | open a new git repository context
 openRepo :: FilePath -> IO Git
-openRepo path = liftM2 (Git path) (newIORef []) (newIORef [])
+openRepo path = liftM3 (Git path) (newIORef []) (newIORef []) packedRef
+    where packedRef = newCacheVal (packedRefsPath path) (M.fromList <$> readPackedRefs path) M.empty
 
 -- | close a git repository context, closing all remaining fileReaders.
 closeRepo :: Git -> IO ()

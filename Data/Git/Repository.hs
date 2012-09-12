@@ -36,7 +36,10 @@ import Data.Git.Storage.Object
 import Data.Git.Storage
 import Data.Git.Revision
 import Data.Git.Storage.Loose
+import Data.Git.Storage.CacheFile
 import Data.Git.Ref
+
+import qualified Data.Map as M
 
 -- | hierarchy tree, either a reference to a blob (file) or a tree (directory).
 data HTreeEnt = TreeDir Ref HTree | TreeFile Ref
@@ -63,48 +66,69 @@ getTree git ref = getObject git ref True >>= mapJustM unwrap
 -- | try to resolve a string to a specific commit ref
 -- for example: HEAD, HEAD^, master~3, shortRef
 resolveRevision :: Git -> Revision -> IO (Maybe Ref)
-resolveRevision git (Revision prefix modifiers) = resolvePrefix >>= modf modifiers
-        where
-                resolvePrefix :: IO Ref
-                resolvePrefix = resolveNamedPrefix fs >>= maybe resolvePrePrefix (return . Just) >>= maybe (return $ fromHexString prefix) return
+resolveRevision git (Revision prefix modifiers) =
+    getCacheVal (packedNamed git) >>= \c -> resolvePrefix c >>= modf modifiers
+    where
+          resolvePrefix lookupCache = tryResolvers
+                [resolveNamedPrefix lookupCache namedResolvers
+                ,resolvePrePrefix
+                ]
 
-                resolvePrePrefix :: IO (Maybe Ref)
-                resolvePrePrefix = do
-                        refs <- findReferencesWithPrefix git prefix
-                        case refs of
-                                []  -> return Nothing
-                                [r] -> return (Just r)
-                                _   -> error "multiple references with this prefix"
+          resolveNamedPrefix _           []     = return Nothing
+          resolveNamedPrefix lookupCache (x:xs) = followToRef (resolveNamedPrefix lookupCache xs) x
+            where followToRef onFailure refty = do
+                      exists <- existsRefFile (gitRepoPath git) refty
+                      if exists
+                          then do refcont <- readRefFile (gitRepoPath git) refty
+                                  case refcont of
+                                       RefDirect ref     -> return $ Just ref
+                                       RefLink refspecty -> followToRef onFailure refspecty
+                                       _                 -> error "cannot handle reference content"
+                          else case M.lookup refty lookupCache of
+                                    Nothing -> onFailure
+                                    y       -> return y
 
-                fs = [ (specialExists, specialRead), (tagExists, tagRead), (headExists, headRead) ]
+          namedResolvers = case prefix of
+                               "HEAD"       -> [ RefHead ]
+                               "ORIG_HEAD"  -> [ RefOrigHead ]
+                               "FETCH_HEAD" -> [ RefFetchHead ]
+                               _            -> [ RefTag prefix, RefBranch prefix, RefRemote prefix ]
 
-                resolveNamedPrefix []     = return Nothing
-                resolveNamedPrefix (x:xs) = do
-                        exists <- (fst x) (gitRepoPath git) prefix
-                        if exists
-                                then Just <$> (snd x) (gitRepoPath git) prefix
-                                else resolveNamedPrefix xs
-        
-                modf [] ref                  = return (Just ref)
-                modf (RevModParent i:xs) ref = do
-                        parentRefs <- getParentRefs ref
-                        case i of
-                                0 -> error "revision modifier ^0 is not implemented"
-                                _ -> case drop (i - 1) parentRefs of
-                                        []    -> error "no such parent"
-                                        (p:_) -> modf xs p
 
-                modf (RevModParentFirstN 1:xs) ref = modf (RevModParent 1:xs) ref
-                modf (RevModParentFirstN n:xs) ref = do
-                        parentRefs <- getParentRefs ref
-                        modf (RevModParentFirstN (n-1):xs) (head parentRefs)
-                modf (_:_) _ = error "unimplemented revision modifier"
+          tryResolvers :: [IO (Maybe Ref)] -> IO Ref
+          tryResolvers []            = return $ fromHexString prefix
+          tryResolvers (resolver:xs) = resolver >>= isResolved
+             where isResolved (Just r) = return r
+                   isResolved Nothing  = tryResolvers xs
 
-                getParentRefs ref = do
-                        obj <- getCommit git ref
-                        case obj of
-                                Just (Commit _ parents _ _ _) -> return parents
-                                Nothing -> error "reference in commit chain doesn't exists"
+          resolvePrePrefix :: IO (Maybe Ref)
+          resolvePrePrefix = do
+              refs <- findReferencesWithPrefix git prefix
+              case refs of
+                  []  -> return Nothing
+                  [r] -> return (Just r)
+                  _   -> error "multiple references with this prefix"
+
+          modf [] ref                  = return (Just ref)
+          modf (RevModParent i:xs) ref = do
+              parentRefs <- getParentRefs ref
+              case i of
+                  0 -> error "revision modifier ^0 is not implemented"
+                  _ -> case drop (i - 1) parentRefs of
+                            []    -> error "no such parent"
+                            (p:_) -> modf xs p
+
+          modf (RevModParentFirstN 1:xs) ref = modf (RevModParent 1:xs) ref
+          modf (RevModParentFirstN n:xs) ref = do
+              parentRefs <- getParentRefs ref
+              modf (RevModParentFirstN (n-1):xs) (head parentRefs)
+          modf (_:_) _ = error "unimplemented revision modifier"
+
+          getParentRefs ref = do
+              obj <- getCommit git ref
+              case obj of
+                  Just (Commit { commitParents = parents }) -> return parents
+                  Nothing -> error "reference in commit chain doesn't exists"
 
 -- | returns a tree from a ref that might be either a commit, a tree or a tag.
 resolveTreeish :: Git -> Ref -> IO (Maybe Tree)
