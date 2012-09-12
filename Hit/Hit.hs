@@ -138,7 +138,7 @@ revList revision git = do
 	where loopTillEmpty ref = do
 		obj <- getCommit git ref
 		case obj of
-			Just (Commit _ parents _ _ _) -> do
+			Just (Commit { commitParents = parents }) -> do
 				putStrLn $ show ref
 				-- this behave like rev-list --first-parent.
 				-- otherwise the parents need to be organized and printed

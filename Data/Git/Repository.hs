@@ -50,14 +50,14 @@ mapJustM _ Nothing  = return Nothing
 getCommit :: Git -> Ref -> IO (Maybe Commit)
 getCommit git ref = getObject git ref True >>= mapJustM unwrap
         where
-                unwrap (objectToCommit -> Just c@(Commit _ _ _ _ _)) = return $ Just c
-                unwrap _                                             = return Nothing
+                unwrap (objectToCommit -> Just c@(Commit {})) = return $ Just c
+                unwrap _                                      = return Nothing
 
 -- | get a specified tree
 getTree :: Git -> Ref -> IO (Maybe Tree)
 getTree git ref = getObject git ref True >>= mapJustM unwrap
         where
-                unwrap (objectToTree -> Just c@(Tree _ )) = return $ Just c
+                unwrap (objectToTree -> Just c@(Tree {})) = return $ Just c
                 unwrap _                                  = return Nothing
 
 -- | try to resolve a string to a specific commit ref
@@ -109,7 +109,7 @@ resolveRevision git (Revision prefix modifiers) = resolvePrefix >>= modf modifie
 -- | returns a tree from a ref that might be either a commit, a tree or a tag.
 resolveTreeish :: Git -> Ref -> IO (Maybe Tree)
 resolveTreeish git ref = getObject git ref True >>= mapJustM recToTree where
-        recToTree (objectToCommit -> Just (Commit tree _ _ _ _)) = resolveTreeish git tree
+        recToTree (objectToCommit -> Just (Commit { commitTreeish = tree })) = resolveTreeish git tree
         recToTree (objectToTag    -> Just (Tag tref _ _ _ _))    = resolveTreeish git tref
         recToTree (objectToTree   -> Just t@(Tree _))            = return $ Just t
         recToTree _                                              = return Nothing
@@ -179,7 +179,7 @@ resolvePath :: Git            -- ^ repository
 resolvePath git commitRef paths = do
         commit <- getCommit git commitRef
         case commit of
-                Just (Commit tree _ _ _ _) -> resolve tree paths
+                Just (Commit { commitTreeish = tree }) -> resolve tree paths
                 Nothing                    -> error ("not a valid commit ref: " ++ show commitRef)
         where
                 resolve :: Ref -> [ByteString] -> IO (Maybe Ref)
