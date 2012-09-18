@@ -15,6 +15,10 @@ module Data.Git.Types
     , CommitExtra(..)
     , Blob(..)
     , Tag(..)
+    -- * time type
+    , GitTime(..)
+    , toUTCTime
+    , toPOSIXTime
     -- * Pack delta types
     , DeltaOfs(..)
     , DeltaRef(..)
@@ -31,7 +35,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.Git.Ref
 import Data.Git.Delta
 import Data.Time.Clock
-import Data.Time.LocalTime
+import Data.Time.Clock.POSIX
 
 -- | type of a git object.
 data ObjectType =
@@ -42,6 +46,16 @@ data ObjectType =
         | TypeDeltaOff
         | TypeDeltaRef
         deriving (Show,Eq)
+
+-- | Git time is number of seconds since unix epoch
+data GitTime = GitTime Integer Int
+    deriving (Show,Eq)
+
+toUTCTime :: GitTime -> UTCTime
+toUTCTime (GitTime seconds _) = posixSecondsToUTCTime $ fromIntegral seconds
+
+toPOSIXTime :: GitTime -> POSIXTime
+toPOSIXTime = utcTimeToPOSIXSeconds . toUTCTime
 
 -- | the enum instance is useful when marshalling to pack file.
 instance Enum ObjectType where
@@ -69,7 +83,7 @@ type TreeEnt = (Int,ByteString,Ref)
 -- has the format: name <email> time timezone
 -- FIXME: should be a string, but I don't know if the data is stored
 -- consistantly in one encoding (UTF8)
-type Name = (ByteString,ByteString,UTCTime,TimeZone)
+type Name = (ByteString,ByteString,GitTime)
 
 -- | Represent a root tree with zero to many tree entries.
 data Tree = Tree { treeGetEnts :: [TreeEnt] } deriving (Show,Eq)

@@ -53,10 +53,16 @@ instance Arbitrary UTCTime where
                         <*> (secondsToDiffTime <$> arbitrary)
         where b = fromGregorian 1970 1 1
 
-arbitraryName = liftM4 (,,,) (arbitraryBSnoangle 16)
-                             (arbitraryBSnoangle 16)
-                             arbitrary
-                             arbitrary
+instance Arbitrary GitTime where
+    arbitrary = GitTime <$> (arbitrary `suchThat` \i -> i > 0) <*> arbitraryTz
+        where arbitraryTz = do
+                    h <- choose (0, 23)
+                    m <- (* 30) <$> choose (0,1)
+                    return (h * 100 + m - 1200)
+
+arbitraryName = liftM3 (,,) (arbitraryBSnoangle 16)
+                            (arbitraryBSnoangle 16)
+                            arbitrary
 
 arbitraryObjTypeNoDelta = oneof [return TypeTree,return TypeBlob,return TypeCommit,return TypeTag]
 

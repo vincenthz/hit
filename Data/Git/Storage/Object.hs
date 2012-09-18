@@ -59,9 +59,6 @@ import Data.Monoid
 import Data.Word
 import Text.Printf
 
-import Data.Time.LocalTime
-import Data.Time.Clock.POSIX
-
 import Blaze.ByteString.Builder
 import Blaze.ByteString.Builder.Char8
 
@@ -220,10 +217,8 @@ parseName = do
         time <- PC.decimal :: Parser Integer
         _ <- string " "
         timezone <- PC.signed PC.decimal
-        let (hours,minutes) = timezone `divMod` 100
         skipChar '\n'
-        let tz = minutesToTimeZone (hours*60 + (if hours > 0 then minutes else (-minutes)))
-        return (name, email, posixSecondsToUTCTime $ fromIntegral time, tz)
+        return (name, email, GitTime time timezone)
 
 objectParseTree   = ObjTree <$> treeParse
 objectParseCommit = ObjCommit <$> commitParse
@@ -327,7 +322,7 @@ objectHash :: ObjectType -> Word64 -> L.ByteString -> Ref
 objectHash ty w lbs = hashLBS $ L.fromChunks (objectWriteHeader ty w : L.toChunks lbs)
 
 -- used for objectWrite for commit and tag
-writeName label (name, email, time, tz) =
-        B.concat [label, " ", name, " <", email, "> ", BC.pack (printf "%d %s" timeSeconds (timeZoneOffsetString tz)) ]
-        where timeSeconds :: Integer
-              timeSeconds = truncate (realToFrac $ utcTimeToPOSIXSeconds time :: Double)
+writeName label (name, email, (GitTime time tz)) =
+        B.concat [label, " ", name, " <", email, "> ", BC.pack (printf "%d %s%02d%02d" time tzs tzh tzm) ]
+        where tzs = if tz >= 0 then "+" else "-" :: String
+              (tzh,tzm) = abs (tz) `divMod` 100
