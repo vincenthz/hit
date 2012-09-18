@@ -167,9 +167,10 @@ referenceHex = fromHex <$> P.take 40
 referenceBin = fromBinary <$> P.take 20
 
 -- | parse a tree content
-treeParse = (Tree <$> parseEnts) where
-        parseEnts = atEnd >>= \end -> if end then return [] else liftM2 (:) parseEnt parseEnts
-        parseEnt = liftM3 (,,) octal (PC.char ' ' >> takeTill ((==) 0)) (word8 0 >> referenceBin)
+treeParse = Tree <$> parseEnts
+    where parseEnts = atEnd >>= \end -> if end then return [] else liftM2 (:) parseEnt parseEnts
+          parseEnt = liftM3 (,,) octal (PC.char ' ' >> takeTill ((==) 0)) (word8 0 >> referenceBin)
+
 -- | parse a blob content
 blobParse = (Blob <$> takeLazyByteString)
 
@@ -240,13 +241,13 @@ objectWrite (ObjBlob blob)     = blobWrite blob
 objectWrite (ObjTree tree)     = treeWrite tree
 objectWrite _                  = error "delta cannot be marshalled"
 
-treeWrite (Tree ents) = L.fromChunks $ concat $ map writeTreeEnt ents where
-        writeTreeEnt (perm,name,ref) =
-                [ BC.pack $ printf "%o" perm
-                , BC.singleton ' '
-                , name
-                , B.singleton 0
-                , toBinary ref
+treeWrite (Tree ents) = toLazyByteString $ mconcat $ concatMap writeTreeEnt ents
+    where writeTreeEnt (perm,name,ref) =
+                [ fromString (printf "%o" perm)
+                , fromString " "
+                , fromByteString name
+                , fromString "\0"
+                , fromByteString $ toBinary ref
                 ]
 
 commitWrite (Commit tree parents author committer encoding extra msg) =
@@ -273,12 +274,14 @@ commitWrite (Commit tree parents author committer encoding extra msg) =
                 ]
 
 tagWrite (Tag ref ty tag tagger signature) =
-        L.fromChunks [BC.unlines ls, B.singleton 0xa, signature]
-        where
-                ls = [ "object " `BC.append` (toHex ref)
-                     , "type " `BC.append` (BC.pack $ objectTypeMarshall ty)
-                     , "tag " `BC.append` tag
-                     , writeName "tagger" tagger ]
+    toLazyByteString $ mconcat els
+    where els = [ fromString "object ", fromByteString (toHex ref), eol
+                , fromString "type ", fromString (objectTypeMarshall ty), eol
+                , fromString "tag ", fromByteString tag, eol
+                , fromByteString $ writeName "tagger" tagger, eol
+                , eol
+                , fromByteString signature
+                ]
 
 eol = fromString "\n"
 
