@@ -51,19 +51,19 @@ import qualified Data.ByteString.Lazy as L
 import Data.Attoparsec.Lazy
 import qualified Data.Attoparsec.Lazy as P
 import qualified Data.Attoparsec.Char8 as PC
-import Control.Applicative ((<$>), many)
+import Control.Applicative ((<$>), (<*), (*>), many)
 import Control.Monad
 
+import Data.List (intersperse)
+import Data.Monoid
 import Data.Word
 import Text.Printf
 
 import Data.Time.LocalTime
 import Data.Time.Clock.POSIX
 
-{-
 import Blaze.ByteString.Builder
-import Blaze.ByteString.Builder.ByteString
--}
+import Blaze.ByteString.Builder.Char8
 
 -- | location of an object in the database
 data ObjectLocation = NotFound | Loose Ref | Packed Ref Word64
@@ -155,6 +155,11 @@ octal = B.foldl' step 0 `fmap` takeWhile1 isOct where
         isOct w = w >= 0x30 && w <= 0x37
         step a w = a * 8 + fromIntegral (w - 0x30)
 
+tillEOL :: Parser ByteString
+tillEOL = PC.takeWhile ((/= '\n'))
+
+skipEOL = skipChar '\n'
+
 skipChar :: Char -> Parser ()
 skipChar c = PC.char c >> return ()
 
@@ -175,15 +180,24 @@ commitParse = do
         parents   <- many parseParentRef
         author    <- string "author " >> parseName
         committer <- string "committer " >> parseName
+        encoding  <- option Nothing $ Just <$> (string "encoding " >> tillEOL)
+        extras    <- many parseExtra
         skipChar '\n'
         message <- takeByteString
-        return $ Commit tree parents author committer message
+        return $ Commit tree parents author committer encoding extras message
         where
                 parseParentRef = do
                         tree <- string "parent " >> referenceHex
                         skipChar '\n'
                         return tree
-                
+                parseExtra = do
+                        f <- B.pack . (:[]) <$> notWord8 0xa
+                        r <- tillEOL
+                        skipEOL
+                        v <- concatLines <$> many (string " " *> tillEOL <* skipEOL)
+                        return $ CommitExtra (f `B.append` r) v
+                concatLines = B.concat . intersperse (B.pack [0xa])
+
 -- | parse a tag content
 tagParse = do
         object <- string "object " >> referenceHex
@@ -235,13 +249,28 @@ treeWrite (Tree ents) = L.fromChunks $ concat $ map writeTreeEnt ents where
                 , toBinary ref
                 ]
 
-commitWrite (Commit tree parents author committer msg) =
-        L.fromChunks [BC.unlines ls, B.singleton 0xa, msg]
-        where
-                ls = [ "tree " `BC.append` (toHex tree) ] ++
-                     map (BC.append "parent " . toHex) parents ++
-                     [ writeName "author" author
-                     , writeName "committer" committer ]
+commitWrite (Commit tree parents author committer encoding extra msg) =
+    toLazyByteString $ mconcat els
+    where
+          toNamedRef s r = mconcat [fromString s, fromByteString (toHex r),eol]
+          toParent       = toNamedRef "parent "
+          toCommitExtra :: CommitExtra -> [Builder]
+          toCommitExtra (CommitExtra k v) = [fromByteString k, eol] ++
+                                            (concatMap (\l -> [fromByteString " ", fromByteString l, eol]) $ linesLast v)
+
+          linesLast b
+            | B.length b > 0 && B.last b == 0xa = BC.lines b ++ [ "" ]
+            | otherwise                         = BC.lines b
+          els = [toNamedRef "tree " tree ]
+             ++ map toParent parents
+             ++ [fromByteString $ writeName "author" author, eol
+                ,fromByteString $ writeName "committer" committer, eol
+                ,maybe (fromByteString B.empty) (fromByteString) encoding -- FIXME need eol
+                ]
+             ++ concatMap toCommitExtra extra
+             ++ [eol
+                ,fromByteString msg
+                ]
 
 tagWrite (Tag ref ty tag tagger signature) =
         L.fromChunks [BC.unlines ls, B.singleton 0xa, signature]
@@ -250,6 +279,8 @@ tagWrite (Tag ref ty tag tagger signature) =
                      , "type " `BC.append` (BC.pack $ objectTypeMarshall ty)
                      , "tag " `BC.append` tag
                      , writeName "tagger" tagger ]
+
+eol = fromString "\n"
 
 blobWrite (Blob bData) = bData
 

@@ -60,8 +60,13 @@ arbitraryName = liftM4 (,,,) (arbitraryBSnoangle 16)
 
 arbitraryObjTypeNoDelta = oneof [return TypeTree,return TypeBlob,return TypeCommit,return TypeTag]
 
+arbitrarySmallList = frequency [ (2, return []), (1, resize 3 arbitrary) ]
+
 instance Arbitrary Commit where
-    arbitrary = Commit <$> arbitrary <*> arbitraryRefList <*> arbitraryName <*> arbitraryName <*> arbitraryMsg
+    arbitrary = Commit <$> arbitrary <*> arbitraryRefList <*> arbitraryName <*> arbitraryName <*> return Nothing <*> arbitrarySmallList <*> arbitraryMsg
+
+instance Arbitrary CommitExtra where
+    arbitrary = CommitExtra <$> arbitraryBSascii 80 <*> arbitraryMsg
 
 instance Arbitrary Tree where
     arbitrary = Tree <$> arbitraryEnts

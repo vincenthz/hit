@@ -12,6 +12,7 @@ module Data.Git.Types
     -- * Main git types
     , Tree(..)
     , Commit(..)
+    , CommitExtra(..)
     , Blob(..)
     , Tag(..)
     -- * Pack delta types
@@ -87,8 +88,15 @@ data Commit = Commit
         , commitParents   :: [Ref]
         , commitAuthor    :: Name
         , commitCommitter :: Name
+        , commitEncoding  :: Maybe ByteString
+        , commitExtras    :: [CommitExtra]
         , commitMessage   :: ByteString
         } deriving (Show,Eq)
+
+data CommitExtra = CommitExtra
+    { commitExtraKey   :: ByteString
+    , commitExtraValue :: ByteString
+    } deriving (Show,Eq)
 
 -- | Represent a signed tag.
 data Tag = Tag
