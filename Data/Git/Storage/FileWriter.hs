@@ -15,7 +15,8 @@ import Control.Exception (bracket)
 
 import qualified Crypto.Hash.SHA1 as SHA1
 
-import System.IO
+import System.IO (hClose)
+import Filesystem
 
 defaultCompression = 6
 

@@ -46,7 +46,10 @@ import Codec.Zlib.Lowlevel
 import Foreign.ForeignPtr
 import qualified Control.Exception as E
 
-import System.IO
+import System.IO (hClose, hSeek, SeekMode(..))
+import Filesystem
+import Filesystem.Path
+import Prelude hiding (FilePath)
 
 data FileReader = FileReader
         { fbHandle     :: Handle

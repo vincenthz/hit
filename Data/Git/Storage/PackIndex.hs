@@ -28,13 +28,14 @@ module Data.Git.Storage.PackIndex
 import Control.Applicative ((<$>))
 import Control.Monad
 
-import System.FilePath
-import System.Directory
-import System.IO
+import Filesystem
+import Filesystem.Path
+import Filesystem.Path.Rules
 
 import Data.List
 import Data.Bits
 import Data.Word
+import Data.String
 
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
@@ -45,6 +46,8 @@ import Data.Git.Internal
 import Data.Git.Storage.FileReader
 import Data.Git.Path
 import Data.Git.Ref
+
+import Prelude hiding (FilePath)
 
 -- | represent an packIndex header with the version and the fanout table
 data PackIndexHeader = PackIndexHeader !Word32 !(Vector Word32)
@@ -59,7 +62,7 @@ data PackIndex = PackIndex
         }
 
 -- | enumerate every indexes file in the pack directory
-packIndexEnumerate repoPath = map onlyHash . filter isPackFile <$> getDirectoryContents (repoPath </> "objects" </> "pack")
+packIndexEnumerate repoPath = map onlyHash . filter isPackFile . map (encodeString posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
         where
                 isPackFile x = ".idx" `isSuffixOf` x && "pack-" `isPrefixOf` x
                 onlyHash = fromHexString . takebut 4 . drop 5

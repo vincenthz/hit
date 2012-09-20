@@ -36,12 +36,13 @@ import Data.Git.Internal
 import Data.Git.Storage.FileWriter
 import Data.Git.Storage.Object
 
-import System.FilePath
-import System.Directory
-import System.IO (openFile, hFileSize, IOMode(..))
+import Filesystem
+import Filesystem.Path
+import Filesystem.Path.Rules
 
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString as B
 
 import Data.Attoparsec.Lazy
 import qualified Data.Attoparsec.Char8 as PC
@@ -50,7 +51,10 @@ import Control.Monad
 import Control.Exception (onException, SomeException)
 import qualified Control.Exception as E
 
+import Data.String
 import Data.Char (isHexDigit)
+
+import Prelude hiding (FilePath)
 
 isObjectPrefix [a,b] = isHexDigit a && isHexDigit b
 isObjectPrefix _     = False
@@ -113,15 +117,15 @@ looseReadHeader repoPath ref = toHeader <$> readZippedFile (objectPathOfRef repo
 looseRead repoPath ref = looseUnmarshallZipped <$> readZippedFile (objectPathOfRef repoPath ref)
 
 -- | check if a specific ref exists as loose object
-looseExists repoPath ref = doesFileExist (objectPathOfRef repoPath ref)
+looseExists repoPath ref = isFile (objectPathOfRef repoPath ref)
 
 -- | enumarate all prefixes available in the object store.
-looseEnumeratePrefixes repoPath = filter isObjectPrefix <$> getDirectoryContents (repoPath </> "objects")
+looseEnumeratePrefixes repoPath = filter isObjectPrefix <$> getDirectoryContents (repoPath </> fromString "objects")
 
 -- | enumerate all references available with a specific prefix.
 looseEnumerateWithPrefixFilter :: FilePath -> String -> (Ref -> Bool) -> IO [Ref]
 looseEnumerateWithPrefixFilter repoPath prefix filterF =
-        filter filterF . map (fromHexString . (prefix ++)) . filter isRef <$> getDir (repoPath </> "objects" </> prefix)
+        filter filterF . map (fromHexString . (prefix ++)) . filter isRef <$> getDir (repoPath </> fromString "objects" </> fromString prefix)
         where
                 getDir p = E.catch (getDirectoryContents p) (\(_::SomeException) -> return [])
                 isRef l = length l == 38
@@ -141,28 +145,35 @@ looseMarshall obj
 -- | create a new blob on a temporary location and on success move it to
 -- the object store with its digest name.
 looseWriteBlobFromFile repoPath file = do
-        fsz <- openFile file ReadMode >>= hFileSize
+        fsz <- getSize file
         let hdr = objectWriteHeader TypeBlob (fromIntegral fsz)
         tmpPath <- objectTemporaryPath repoPath
         flip onException (removeFile tmpPath) $ do
                 (ref, npath) <- withFileWriter tmpPath $ \fw -> do
                         fileWriterOutput fw hdr
-                        chunks <- L.toChunks <$> L.readFile file
-                        mapM_ (fileWriterOutput fw) chunks
+                        withFile file ReadMode $ \h -> loop h fw
                         digest <- fileWriterGetDigest fw
                         return (digest, objectPathOfRef repoPath digest)
-                exists <- doesFileExist npath
+                exists <- isFile npath
                 when exists $ error "destination already exists"
-                renameFile tmpPath npath
+                rename tmpPath npath
                 return ref
+    where loop h fw = do
+                r <- B.hGet h (32*1024)
+                if B.null r
+                    then return ()
+                    else fileWriterOutput fw r >> loop h fw
 
 -- | write an object to disk as a loose reference.
 -- use looseWriteBlobFromFile for efficiently writing blobs when being commited from a file.
-looseWrite repoPath obj = createDirectoryIfMissing True (takeDirectory path)
-                       >> doesFileExist path
-                       >>= \exists -> unless exists (L.writeFile path $ compress content)
+looseWrite repoPath obj = createDirectory False (directory path)
+                       >> isFile path
+                       >>= \exists -> unless exists (writeFileLazy path $ compress content)
                        >> return ref
         where
                 path    = objectPathOfRef repoPath ref
                 content = looseMarshall obj
                 ref     = hashLBS content
+                writeFileLazy p bs = withFile p WriteMode (\h -> L.hPut h bs)
+
+getDirectoryContents p = map (encodeString posix . filename) <$> listDirectory p

@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- |
 -- Module      : Data.Git.Storage
 -- License     : BSD-style
@@ -31,8 +32,9 @@ module Data.Git.Storage
     , setObject
     ) where
 
-import System.Directory
-import System.FilePath
+import Filesystem
+import Filesystem.Path hiding (concat)
+import Filesystem.Path.Rules
 import System.Environment
 
 import Control.Applicative ((<$>))
@@ -40,6 +42,7 @@ import Control.Exception
 import qualified Control.Exception as E
 import Control.Monad
 
+import Data.String
 import Data.List ((\\), isPrefixOf)
 import Data.IORef
 import Data.Word
@@ -56,6 +59,8 @@ import Data.Git.Storage.CacheFile
 import Data.Git.Ref
 
 import qualified Data.Map as M
+
+import Prelude hiding (FilePath)
 
 data PackIndexReader = PackIndexReader PackIndexHeader FileReader
 
@@ -89,19 +94,20 @@ closeRepo (Git { indexReaders = ireaders, packReaders = preaders }) = do
 -- otherwise iterate from current directory, up to 128 parents for a .git directory
 findRepo :: IO FilePath
 findRepo = do
-        menvDir <- E.catch (Just <$> getEnv "GIT_DIR") (\(_:: SomeException) -> return Nothing)
+        menvDir <- E.catch (Just . decodeString posix_ghc704 <$> getEnv "GIT_DIR") (\(_:: SomeException) -> return Nothing)
         case menvDir of
-                Nothing     -> checkDir 0
+                Nothing     -> getWorkingDirectory >>= checkDir 0
                 Just envDir -> do
                         e <- isRepo envDir
                         when (not e) $ error "environment GIT_DIR is not a git repository" 
                         return envDir
         where
-                checkDir 128 = error "not a git repository"
-                checkDir n   = do
-                        let filepath = concat (replicate n ("../") ++ [".git"])
+                checkDir :: Int -> FilePath -> IO FilePath
+                checkDir 128 _  = error "not a git repository"
+                checkDir n   wd = do
+                        let filepath = wd </> ".git"
                         e <- isRepo filepath
-                        if e then return filepath else checkDir (n+1)
+                        if e then return filepath else checkDir (n+1) (if absolute wd then parent wd else wd </> "..")
 
 -- | execute a function f with a git context.
 withRepo path f = bracket (openRepo path) closeRepo f
@@ -115,23 +121,23 @@ withCurrentRepo f = findRepo >>= \path -> withRepo path f
 -- | basic checks to see if a specific path looks like a git repo.
 isRepo :: FilePath -> IO Bool
 isRepo path = do
-        dir     <- doesDirectoryExist path
-        subDirs <- mapM (doesDirectoryExist . (path </>))
-                ["branches","hooks","info"
-                ,"logs","objects","refs"
-                ,"refs"</>"heads","refs"</>"tags"]
+        dir     <- isDirectory path
+        subDirs <- mapM (isDirectory . (path </>))
+                [ "branches", "hooks", "info"
+                , "logs", "objects", "refs"
+                , "refs"</> "heads", "refs"</> "tags"]
         return $ and ([dir] ++ subDirs)
 
 -- | initialize a new repository at a specific location.
 initRepo :: FilePath -> IO ()
 initRepo path = do
-        exists <- doesDirectoryExist path
+        exists <- isDirectory path
         when exists $ error "destination directory already exists"
-        createDirectory path
-        mapM_ (createDirectory . (path </>))
-                ["branches","hooks","info"
-                ,"logs","objects","refs"
-                ,"refs"</>"heads","refs"</>"tags"]
+        createDirectory True path
+        mapM_ (createDirectory False . (path </>))
+                [ "branches", "hooks", "info"
+                , "logs", "objects", "refs"
+                , "refs"</> "heads", "refs"</> "tags"]
 
 iterateIndexes git f initAcc = do
         allIndexes    <- packIndexEnumerate (gitRepoPath git)

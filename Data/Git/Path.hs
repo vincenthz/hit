@@ -5,37 +5,39 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Git.Path where
 
-import System.FilePath
+import Filesystem.Path.CurrentOS
 import System.Random
 import Control.Applicative ((<$>))
 import Data.Git.Ref
+import Data.String
 
 headsPath gitRepo = gitRepo </> "refs" </> "heads"
 tagsPath gitRepo  = gitRepo </> "refs" </> "tags"
 remotesPath gitRepo = gitRepo </> "refs" </> "remotes"
 packedRefsPath gitRepo = gitRepo </> "packed-refs"
 
-headPath gitRepo name = headsPath gitRepo </> name
-tagPath gitRepo name = tagsPath gitRepo </> name
-remotePath gitRepo name = remotesPath gitRepo </> name
-specialPath gitRepo name = gitRepo </> name
+headPath gitRepo name = headsPath gitRepo </> fromString name
+tagPath gitRepo name = tagsPath gitRepo </> fromString name
+remotePath gitRepo name = remotesPath gitRepo </> fromString name
+specialPath gitRepo name = gitRepo </> fromString name
 
-remoteEntPath gitRepo name ent = remotePath gitRepo name </> ent
+remoteEntPath gitRepo name ent = remotePath gitRepo name </> fromString ent
 
 packDirPath repoPath = repoPath </> "objects" </> "pack"
 
 indexPath repoPath indexRef =
-        packDirPath repoPath </> ("pack-" ++ toHexString indexRef ++ ".idx")
+        packDirPath repoPath </> fromString ("pack-" ++ toHexString indexRef ++ ".idx")
 
 packPath repoPath packRef =
-        packDirPath repoPath </> ("pack-" ++ toHexString packRef ++ ".pack")
+        packDirPath repoPath </> fromString ("pack-" ++ toHexString packRef ++ ".pack")
 
-objectPath repoPath d f = repoPath </> "objects" </> d </> f
+objectPath repoPath d f = repoPath </> "objects" </> fromString d </> fromString f
 objectPathOfRef repoPath ref = objectPath repoPath d f
         where (d,f) = toFilePathParts ref
 
 objectTemporaryPath repoPath = do
         r <- fst . random <$> getStdGen :: IO Int
-        return (repoPath </> "objects" </> ("tmp-" ++ show r ++ ".tmp"))
+        return (repoPath </> "objects" </> fromString ("tmp-" ++ show r ++ ".tmp"))

@@ -28,10 +28,11 @@ import Control.Applicative ((<$>))
 import Control.Arrow (second)
 import Control.Monad
 
-import System.IO
-import System.FilePath
-import System.Directory
+import Filesystem.Path.Rules
+import Filesystem.Path
+import Filesystem
 
+import Data.String
 import Data.Bits
 import Data.List
 import qualified Data.ByteString.Lazy as L
@@ -49,6 +50,7 @@ import Data.Git.Types
 import Data.Git.Storage.FileReader
 
 import Data.Word
+import Prelude hiding (FilePath)
 
 type PackedObjectRaw = (PackedObjectInfo, L.ByteString)
 
@@ -61,7 +63,7 @@ data PackedObjectInfo = PackedObjectInfo
         } deriving (Show,Eq)
 
 -- | Enumerate the pack refs available in this repository.
-packEnumerate repoPath = map onlyHash . filter isPackFile <$> getDirectoryContents (repoPath </> "objects" </> "pack")
+packEnumerate repoPath = map onlyHash . filter isPackFile . map (encodeString posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
         where
                 isPackFile x = ".pack" `isSuffixOf` x
                 onlyHash = fromHexString . takebut 5 . drop 5

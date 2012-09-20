@@ -19,6 +19,9 @@ import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Codec.Compression.Zlib
+import Filesystem.Path
+import Filesystem.Path.Rules
+import Prelude hiding (FilePath)
 
 be32 :: B.ByteString -> Word32
 be32 b = fromIntegral (B.index b 0) `shiftL` 24
@@ -34,7 +37,7 @@ newtype Zipped = Zipped { getZippedData :: L.ByteString }
     deriving (Show,Eq)
 
 readZippedFile :: FilePath -> IO Zipped
-readZippedFile fp = Zipped <$> L.readFile fp
+readZippedFile fp = Zipped <$> L.readFile (encodeString posix fp)
 
 dezip :: Zipped -> L.ByteString
 dezip = decompress . getZippedData

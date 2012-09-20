@@ -31,15 +31,14 @@ Library
                    , attoparsec >= 0.10.1
                    , parsec     >= 3
                    , containers
-                   , filepath
-                   , directory
+                   , system-filepath
+                   , system-fileio
                    , cryptohash
                    , vector
                    , random
                    , zlib
                    , zlib-bindings >= 0.1 && < 0.2
                    , time
-                   , unix
   Exposed-modules:   Data.Git
                      Data.Git.Types
                      Data.Git.Storage
