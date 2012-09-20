@@ -11,9 +11,11 @@ module Data.Git
       Ref
     , Commit(..)
     , Person(..)
+    , CommitExtra(..)
     , Tree(..)
     , Blob(..)
     , Tag(..)
+    , GitTime(..)
 
     -- * Revision
     , Revision
