@@ -15,6 +15,7 @@ module Data.Git.Types
     , CommitExtra(..)
     , Blob(..)
     , Tag(..)
+    , Person(..)
     -- * time type
     , GitTime(..)
     , toUTCTime
@@ -24,7 +25,6 @@ module Data.Git.Types
     , DeltaRef(..)
     -- * Basic types part of other bigger types
     , TreeEnt
-    , Name
     ) where
 
 import Data.Word
@@ -83,7 +83,11 @@ type TreeEnt = (Int,ByteString,Ref)
 -- has the format: name <email> time timezone
 -- FIXME: should be a string, but I don't know if the data is stored
 -- consistantly in one encoding (UTF8)
-type Name = (ByteString,ByteString,GitTime)
+data Person = Person
+    { personName  :: ByteString
+    , personEmail :: ByteString
+    , personTime  :: GitTime
+    } deriving (Show,Eq)
 
 -- | Represent a root tree with zero to many tree entries.
 data Tree = Tree { treeGetEnts :: [TreeEnt] } deriving (Show,Eq)
@@ -100,8 +104,8 @@ data Blob = Blob { blobGetContent :: L.ByteString } deriving (Show,Eq)
 data Commit = Commit
         { commitTreeish   :: Ref
         , commitParents   :: [Ref]
-        , commitAuthor    :: Name
-        , commitCommitter :: Name
+        , commitAuthor    :: Person
+        , commitCommitter :: Person
         , commitEncoding  :: Maybe ByteString
         , commitExtras    :: [CommitExtra]
         , commitMessage   :: ByteString
@@ -117,7 +121,7 @@ data Tag = Tag
         { tagRef        :: Ref
         , tagObjectType :: ObjectType
         , tagBlob       :: ByteString
-        , tagName       :: Name
+        , tagName       :: Person
         , tagS          :: ByteString
         } deriving (Show,Eq)
 

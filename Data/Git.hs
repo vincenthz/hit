@@ -10,6 +10,7 @@ module Data.Git
     -- * Basic types
       Ref
     , Commit(..)
+    , Person(..)
     , Tree(..)
     , Blob(..)
     , Tag(..)

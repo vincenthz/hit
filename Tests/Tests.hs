@@ -60,9 +60,9 @@ instance Arbitrary GitTime where
                     m <- (* 30) <$> choose (0,1)
                     return (h * 100 + m - 1200)
 
-arbitraryName = liftM3 (,,) (arbitraryBSnoangle 16)
-                            (arbitraryBSnoangle 16)
-                            arbitrary
+arbitraryName = liftM3 Person (arbitraryBSnoangle 16)
+                              (arbitraryBSnoangle 16)
+                              arbitrary
 
 arbitraryObjTypeNoDelta = oneof [return TypeTree,return TypeBlob,return TypeCommit,return TypeTag]
 

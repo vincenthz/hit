@@ -176,8 +176,8 @@ commitParse = do
         tree <- string "tree " >> referenceHex
         skipChar '\n'
         parents   <- many parseParentRef
-        author    <- string "author " >> parseName
-        committer <- string "committer " >> parseName
+        author    <- string "author " >> parsePerson
+        committer <- string "committer " >> parsePerson
         encoding  <- option Nothing $ Just <$> (string "encoding " >> tillEOL)
         extras    <- many parseExtra
         skipChar '\n'
@@ -204,12 +204,12 @@ tagParse = do
         skipChar '\n'
         tag   <- string "tag " >> takeTill ((==) 0x0a)
         skipChar '\n'
-        tagger <- string "tagger " >> parseName
+        tagger <- string "tagger " >> parsePerson
         skipChar '\n'
         signature <- takeByteString
         return $ Tag object type_ tag tagger signature
 
-parseName = do
+parsePerson = do
         name <- B.init <$> PC.takeWhile ((/=) '<')
         skipChar '<'
         email <- PC.takeWhile ((/=) '>')
@@ -218,7 +218,7 @@ parseName = do
         _ <- string " "
         timezone <- PC.signed PC.decimal
         skipChar '\n'
-        return (name, email, GitTime time timezone)
+        return $ Person name email (GitTime time timezone)
 
 objectParseTree   = ObjTree <$> treeParse
 objectParseCommit = ObjCommit <$> commitParse
@@ -322,7 +322,7 @@ objectHash :: ObjectType -> Word64 -> L.ByteString -> Ref
 objectHash ty w lbs = hashLBS $ L.fromChunks (objectWriteHeader ty w : L.toChunks lbs)
 
 -- used for objectWrite for commit and tag
-writeName label (name, email, (GitTime time tz)) =
+writeName label (Person name email (GitTime time tz)) =
         B.concat [label, " ", name, " <", email, "> ", BC.pack (printf "%d %s%02d%02d" time tzs tzh tzm) ]
         where tzs = if tz >= 0 then "+" else "-" :: String
               (tzh,tzm) = abs (tz) `divMod` 100
