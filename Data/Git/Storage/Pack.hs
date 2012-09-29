@@ -5,6 +5,7 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Git.Storage.Pack
         ( PackedObjectInfo(..)
         , PackedObjectRaw
@@ -32,7 +33,6 @@ import Filesystem.Path.Rules
 import Filesystem.Path
 import Filesystem
 
-import Data.String
 import Data.Bits
 import Data.List
 import qualified Data.ByteString.Lazy as L

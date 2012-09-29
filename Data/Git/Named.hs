@@ -17,7 +17,6 @@ module Data.Git.Named
     ) where
 
 import Control.Applicative ((<$>))
-import qualified Control.Exception as E
 
 import qualified Filesystem as F
 import qualified Filesystem.Path.Rules as FP (posix, decode, encode, encodeString, decodeString)
