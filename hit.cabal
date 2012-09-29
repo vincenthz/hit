@@ -1,7 +1,16 @@
 Name:                hit
 Version:             0.3.0
-Synopsis:            Git operations
-Description:         Provides low level git operations
+Synopsis:            Git operations in haskell
+Description:
+    .
+    An haskell implementation of git storage operations, allowing users
+    to manipulate git repositories (read and write).
+    .
+    This implementation is fully interoperable with the main C implementation.
+    .
+    This is stricly only manipulating the git store (what's inside the .git directory),
+    and doesn't do anything with the index or your working directory files.
+    .
 License:             BSD3
 License-file:        LICENSE
 Copyright:           Vincent Hanquez <vincent@snarc.org>
