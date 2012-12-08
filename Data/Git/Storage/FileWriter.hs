@@ -42,7 +42,7 @@ withFileWriter path f =
 postDeflate handle = maybe (return ()) (B.hPut handle)
 
 fileWriterOutput (FileWriter { writerHandle = handle, writerDigest = digest, writerDeflate = deflate }) bs = do
-        modifyIORef digest (\ctx -> SHA1.update ctx bs)
+        modifyIORef' digest (\ctx -> SHA1.update ctx bs)
         (>>= postDeflate handle) =<< feedDeflate deflate bs
 
 fileWriterClose (FileWriter { writerHandle = handle, writerDeflate = deflate }) =
