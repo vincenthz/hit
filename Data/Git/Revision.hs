@@ -22,8 +22,19 @@ data RevModifier =
         | RevModAtN Int          -- ^ @{n} accessor
         deriving (Eq)
 
+instance Show RevModifier where
+    show (RevModParent 1)       = "^"
+    show (RevModParent n)       = "^" ++ show n
+    show (RevModParentFirstN n) = "~" ++ show n
+    show (RevModAtType s)       = "@{" ++ s ++ "}"
+    show (RevModAtDate s)       = "@{" ++ s ++ "}"
+    show (RevModAtN s)          = "@{" ++ show s ++ "}"
+
 data Revision = Revision String [RevModifier]
         deriving (Eq)
+
+instance Show Revision where
+    show (Revision s ms) = s ++ concatMap show ms
 
 instance IsString Revision where
     fromString = revFromString
