@@ -16,6 +16,7 @@ module Data.Git.Storage
     , closeRepo
     , withRepo
     , withCurrentRepo
+    , findRepoMaybe
     , findRepo
     , isRepo
     , initRepo
@@ -87,6 +88,23 @@ closeRepo (Git { indexReaders = ireaders, packReaders = preaders }) = do
         mapM_ (closeIndexReader . snd) =<< readIORef ireaders
         mapM_ (fileReaderClose . snd) =<< readIORef preaders
         where closeIndexReader (PackIndexReader _ fr) = fileReaderClose fr
+
+-- | Find the git repository from the current directory.
+--
+-- If the environment variable GIT_DIR is set then it's used,
+-- otherwise iterate from current directory, up to 128 parents for a .git directory
+findRepoMaybe :: IO (Maybe FilePath)
+findRepoMaybe = do
+    menvDir <- E.catch (Just . decodeString posix_ghc704 <$> getEnv "GIT_DIR") (\(_:: SomeException) -> return Nothing)
+    case menvDir of
+        Nothing     -> getWorkingDirectory >>= checkDir 0
+        Just envDir -> isRepo envDir >>= \e -> return (if e then Just envDir else Nothing)
+    where checkDir :: Int -> FilePath -> IO (Maybe FilePath)
+          checkDir 128 _  = return Nothing
+          checkDir n   wd = do
+              let filepath = wd </> ".git"
+              e <- isRepo filepath
+              if e then return (Just filepath) else checkDir (n+1) (if absolute wd then parent wd else wd </> "..")
 
 -- | Find the git repository from the current directory.
 --

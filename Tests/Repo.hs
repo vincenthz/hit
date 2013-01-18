@@ -23,7 +23,11 @@ import Data.Maybe
 import Text.Bytedump
 import System.Exit
 
-onLocalRepo f = withCurrentRepo f
+onLocalRepo f = do
+    fpath <- findRepoMaybe
+    case fpath of
+        Nothing -> putStrLn "cannot run this test without repository. clone the original repository for test"
+        Just _  -> withCurrentRepo f
 
 doLocalMarshallEq git = do
      prefixes <- looseEnumeratePrefixes (gitRepoPath git)
