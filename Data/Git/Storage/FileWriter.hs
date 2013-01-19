@@ -20,6 +20,14 @@ import Filesystem
 
 defaultCompression = 6
 
+-- this is a copy of modifyIORef' found in base 4.6 (ghc 7.6),
+-- for older version of base.
+modifyIORefStrict :: IORef a -> (a -> a) -> IO ()
+modifyIORefStrict ref f = do
+    x <- readIORef ref
+    let x' = f x
+    x' `seq` writeIORef ref x'
+
 data FileWriter = FileWriter
         { writerHandle  :: Handle
         , writerDeflate :: Deflate
@@ -42,7 +50,7 @@ withFileWriter path f =
 postDeflate handle = maybe (return ()) (B.hPut handle)
 
 fileWriterOutput (FileWriter { writerHandle = handle, writerDigest = digest, writerDeflate = deflate }) bs = do
-        modifyIORef' digest (\ctx -> SHA1.update ctx bs)
+        modifyIORefStrict digest (\ctx -> SHA1.update ctx bs)
         (>>= postDeflate handle) =<< feedDeflate deflate bs
 
 fileWriterClose (FileWriter { writerHandle = handle, writerDeflate = deflate }) =
