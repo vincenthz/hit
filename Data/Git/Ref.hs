@@ -130,4 +130,5 @@ toFilePathParts ref = splitAt 2 $ show ref
 -- | hash a bytestring into a reference
 hash = Ref . SHA1.hash
 
+-- | hash a lazy bytestring into a reference
 hashLBS = Ref . SHA1.hashlazy
