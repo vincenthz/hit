@@ -6,21 +6,24 @@
 -- Portability : unix
 --
 module Data.Git.Ref
-        ( Ref
-        , isHex
-        , isHexString
-        , fromHex
-        , fromHexString
-        , fromBinary
-        , toBinary
-        , toHex
-        , toHexString
-        , refPrefix
-        , cmpPrefix
-        , toFilePathParts
-        , hash
-        , hashLBS
-        ) where
+    ( Ref
+    -- * convert from bytestring and string
+    , isHex
+    , isHexString
+    , fromHex
+    , fromHexString
+    , fromBinary
+    , toBinary
+    , toHex
+    , toHexString
+    -- * Misc function related to ref
+    , refPrefix
+    , cmpPrefix
+    , toFilePathParts
+    -- * Hash ByteString types to a ref
+    , hash
+    , hashLBS
+    ) where
 
 import Control.Monad (forM_)
 import qualified Crypto.Hash.SHA1 as SHA1
