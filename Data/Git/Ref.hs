@@ -5,8 +5,11 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+{-# LANGUAGE DeriveDataTypeable #-}
 module Data.Git.Ref
     ( Ref
+    -- * Exceptions
+    , RefInvalid(..)
     -- * convert from bytestring and string
     , isHex
     , isHexString
@@ -34,16 +37,24 @@ import qualified Data.ByteString.Unsafe as B (unsafeIndex)
 import qualified Data.ByteString.Char8 as BC
 import Data.Bits
 import Data.Char (isHexDigit)
+import Data.Data
 
 import Foreign.Storable
+import Control.Exception (Exception)
 
 -- | represent a git reference (SHA1)
 newtype Ref = Ref ByteString
-        deriving (Eq,Ord)
+        deriving (Eq,Ord,Data,Typeable)
 
 instance Show Ref where
         show = BC.unpack . toHex
 
+-- | Invalid Reference exception raised when
+-- using something that is not a ref as a ref.
+data RefInvalid = RefInvalid ByteString
+                deriving (Show,Eq,Data,Typeable)
+
+instance Exception RefInvalid
 isHex = and . map isHexDigit . BC.unpack
 isHexString = and . map isHexDigit
 
@@ -52,7 +63,7 @@ isHexString = and . map isHexDigit
 fromHex :: ByteString -> Ref
 fromHex s
         | B.length s == 40 = Ref $ B.unsafeCreate 20 populateRef
-        | otherwise        = error ("not a valid hex ref: " ++ show s)
+        | otherwise        = throw $ RefInvalid s
         where 
                 populateRef ptr = forM_ [0..19] $ \i -> do
                         let v = (unhex (B.unsafeIndex s (i*2+0)) `shiftL` 4) .|. unhex (B.unsafeIndex s (i*2+1))
@@ -80,7 +91,7 @@ fromHex s
                 unhex 0x64 = 13
                 unhex 0x65 = 14
                 unhex 0x66 = 15 -- 'f'
-                unhex _    = error "error fromHex: not a valid hex character"
+                unhex _    = throw $ RefInvalid s
 
 -- | take a hexadecimal string that represent a reference
 -- and turn into a ref
@@ -109,7 +120,7 @@ toHexString = BC.unpack . toHex
 fromBinary :: ByteString -> Ref
 fromBinary b
         | B.length b == 20 = Ref b
-        | otherwise        = error "not a valid binary ref"
+        | otherwise        = throw $ RefInvalid b -- should hexify the ref here
 
 -- | turn a reference into a binary bytestring
 toBinary :: Ref -> ByteString
