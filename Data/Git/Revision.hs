@@ -9,6 +9,7 @@
 module Data.Git.Revision
     ( Revision(..)
     , RevModifier(..)
+    , RevisionNotFound(..)
     , fromString
     ) where
 
@@ -44,6 +45,10 @@ instance Show RevModifier where
 --    * date
 data Revision = Revision String [RevModifier]
         deriving (Eq,Data,Typeable)
+
+-- | Exception when a revision cannot be resolved to a reference
+data RevisionNotFound = RevisionNotFound Revision
+        deriving (Show,Eq,Data,Typeable)
 
 instance Show Revision where
     show (Revision s ms) = s ++ concatMap show ms
