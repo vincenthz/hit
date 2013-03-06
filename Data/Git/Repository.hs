@@ -51,17 +51,11 @@ mapJustM _ Nothing  = return Nothing
 
 -- | get a specified commit
 getCommit :: Git -> Ref -> IO (Maybe Commit)
-getCommit git ref = getObject git ref True >>= mapJustM unwrap
-        where
-                unwrap (objectToCommit -> Just c@(Commit {})) = return $ Just c
-                unwrap _                                      = return Nothing
+getCommit git ref = maybe Nothing objectToCommit <$> getObject git ref True
 
 -- | get a specified tree
 getTree :: Git -> Ref -> IO (Maybe Tree)
-getTree git ref = getObject git ref True >>= mapJustM unwrap
-        where
-                unwrap (objectToTree -> Just c@(Tree {})) = return $ Just c
-                unwrap _                                  = return Nothing
+getTree git ref = maybe Nothing objectToTree <$> getObject git ref True
 
 -- | try to resolve a string to a specific commit ref
 -- for example: HEAD, HEAD^, master~3, shortRef
