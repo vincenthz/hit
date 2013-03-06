@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 -- |
 -- Module      : Data.Git.Repository
 -- License     : BSD-style
@@ -24,9 +25,11 @@ module Data.Git.Repository
 
 import Control.Applicative ((<$>))
 import Control.Monad
+import Control.Exception (Exception)
 
 import Data.Maybe (fromMaybe)
 import Data.List (find)
+import Data.Data
 
 import Data.ByteString (ByteString)
 
@@ -44,6 +47,13 @@ import qualified Data.Map as M
 -- | hierarchy tree, either a reference to a blob (file) or a tree (directory).
 data HTreeEnt = TreeDir Ref HTree | TreeFile Ref
 type HTree = [(Int,ByteString,HTreeEnt)]
+
+-- | Exception when trying to convert an object pointed by 'Ref' to
+-- a type that is different
+data InvalidType = InvalidType Ref ObjectType
+                 deriving (Show,Eq,Data,Typeable)
+
+instance Exception InvalidType
 
 -- should be a standard function that do that...
 mapJustM f (Just o) = f o
