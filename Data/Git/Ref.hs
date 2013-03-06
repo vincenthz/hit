@@ -10,6 +10,7 @@ module Data.Git.Ref
     ( Ref
     -- * Exceptions
     , RefInvalid(..)
+    , RefNotFound(..)
     -- * convert from bytestring and string
     , isHex
     , isHexString
@@ -54,7 +55,13 @@ instance Show Ref where
 data RefInvalid = RefInvalid ByteString
                 deriving (Show,Eq,Data,Typeable)
 
+-- | Reference wasn't found
+data RefNotFound = RefNotFound Ref
+                 deriving (Show,Eq,Data,Typeable)
+
 instance Exception RefInvalid
+instance Exception RefNotFound
+
 isHex = and . map isHexDigit . BC.unpack
 isHexString = and . map isHexDigit
 

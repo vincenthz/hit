@@ -27,6 +27,7 @@ module Data.Git.Storage
     , getObjectRaw
     , getObjectRawAt
     , getObject
+    , getObject_
     , getObjectAt
     , getObjectType
     -- * setting objects
@@ -303,6 +304,15 @@ getObject :: Git               -- ^ repository
 getObject git ref resolveDelta = maybe Nothing toObj <$> getObjectRaw git ref resolveDelta
         where
                 toObj (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
+
+-- | Just like 'getObject' but will raise a RefNotFound exception if the
+-- reference cannot be found.
+getObject_ :: Git       -- ^ repository
+           -> Ref       -- ^ the object's reference to
+           -> Bool      -- ^ whether to resolve deltas if found
+           -> IO Object -- ^ returned object if found
+getObject_ git ref resolveDelta = maybe (throwIO $ RefNotFound ref) return
+                              =<< getObject git ref resolveDelta
 
 -- | set an object in the store and returns the new ref
 -- this is always going to create a loose object.
