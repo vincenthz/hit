@@ -5,6 +5,7 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+{-# LANGUAGE DeriveDataTypeable #-}
 module Data.Git.Types
     (
     -- * Type of types
@@ -36,6 +37,7 @@ import Data.Git.Ref
 import Data.Git.Delta
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
+import Data.Data
 
 -- | type of a git object.
 data ObjectType =
@@ -45,7 +47,7 @@ data ObjectType =
         | TypeTag
         | TypeDeltaOff
         | TypeDeltaRef
-        deriving (Show,Eq)
+        deriving (Show,Eq,Data,Typeable)
 
 -- | Git time is number of seconds since unix epoch
 data GitTime = GitTime Integer Int
