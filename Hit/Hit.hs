@@ -31,7 +31,7 @@ import qualified Data.Hashable as Hashable
 type HashTable k v = H.CuckooHashTable k v
 
 instance Hashable.Hashable Ref where
-	hash = Hashable.hash . toBinary
+	hashWithSalt salt = Hashable.hashWithSalt salt . toBinary
 
 verifyPack pref git = do
 	offsets     <- H.new
