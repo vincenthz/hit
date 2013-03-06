@@ -5,22 +5,26 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+{-# LANGUAGE DeriveDataTypeable #-}
 module Data.Git.Revision
-        ( Revision(..)
-        , RevModifier(..)
-        , fromString
-        ) where
+    ( Revision(..)
+    , RevModifier(..)
+    , fromString
+    ) where
 
 import Text.Parsec
 import Data.String
+import Data.Data
 
+-- | A modifier to a revision, which is
+-- a function apply of a revision
 data RevModifier =
           RevModParent Int       -- ^ parent accessor ^<n> and ^
         | RevModParentFirstN Int -- ^ parent accessor ~<n>
         | RevModAtType String    -- ^ @{type} accessor
         | RevModAtDate String    -- ^ @{date} accessor
         | RevModAtN Int          -- ^ @{n} accessor
-        deriving (Eq)
+        deriving (Eq,Data,Typeable)
 
 instance Show RevModifier where
     show (RevModParent 1)       = "^"
@@ -30,8 +34,16 @@ instance Show RevModifier where
     show (RevModAtDate s)       = "@{" ++ s ++ "}"
     show (RevModAtN s)          = "@{" ++ show s ++ "}"
 
+-- | A git revision. this can be many things:
+--    * a shorten ref
+--    * a ref
+--    * a named branch or tag
+--  followed by optional modifiers 'RevModifier' that can represent:
+--    * parenting
+--    * type
+--    * date
 data Revision = Revision String [RevModifier]
-        deriving (Eq)
+        deriving (Eq,Data,Typeable)
 
 instance Show Revision where
     show (Revision s ms) = s ++ concatMap show ms
