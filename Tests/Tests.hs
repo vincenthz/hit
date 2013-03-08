@@ -29,6 +29,7 @@ instance Show ObjNoDelta where
 arbitraryBS size = B.pack . map fromIntegral <$> replicateM size (choose (0,255) :: Gen Int)
 arbitraryBSno0 size = B.pack . map fromIntegral <$> replicateM size (choose (1,255) :: Gen Int)
 
+arbitraryBSasciiNoSpace size = B.pack . map fromIntegral <$> replicateM size (choose (0x21,0x7f) :: Gen Int)
 arbitraryBSascii size = B.pack . map fromIntegral <$> replicateM size (choose (0x20,0x7f) :: Gen Int)
 arbitraryBSnoangle size = B.pack . map fromIntegral <$> replicateM size (choose (0x40,0x7f) :: Gen Int)
 
@@ -72,7 +73,7 @@ instance Arbitrary Commit where
     arbitrary = Commit <$> arbitrary <*> arbitraryRefList <*> arbitraryName <*> arbitraryName <*> return Nothing <*> arbitrarySmallList <*> arbitraryMsg
 
 instance Arbitrary CommitExtra where
-    arbitrary = CommitExtra <$> arbitraryBSascii 80 <*> arbitraryMsg
+    arbitrary = CommitExtra <$> arbitraryBSasciiNoSpace 80 <*> arbitraryMsg
 
 instance Arbitrary Tree where
     arbitrary = Tree <$> arbitraryEnts
