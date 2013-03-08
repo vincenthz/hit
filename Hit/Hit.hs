@@ -133,20 +133,17 @@ lsTree revision _ git = do
 		showTreeEnt (p,n,TreeFile r)  = printf "%06o blob %s    %s\n" p (show r) (BC.unpack n)
 
 revList revision git = do
-	ref <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
-	loopTillEmpty ref
-	where loopTillEmpty ref = do
-		obj <- getCommit git ref
-		case obj of
-			Just (Commit { commitParents = parents }) -> do
-				putStrLn $ show ref
-				-- this behave like rev-list --first-parent.
-				-- otherwise the parents need to be organized and printed
-				-- in a reverse chronological fashion.
-				case parents of
-					[]    -> return ()
-					(p:_) -> loopTillEmpty p
-			Nothing -> error ("commit reference " ++ show ref ++ " in commit chain doesn't exists")
+    ref <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
+    loopTillEmpty ref
+    where loopTillEmpty ref = do
+                commit <- getCommit git ref
+                putStrLn $ show ref
+                -- this behave like rev-list --first-parent.
+                -- otherwise the parents need to be organized and printed
+                -- in a reverse chronological fashion.
+                case commitParents commit of
+                    []    -> return ()
+                    (p:_) -> loopTillEmpty p
 
 main = do
 	args <- getArgs

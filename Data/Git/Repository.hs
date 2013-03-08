@@ -12,7 +12,9 @@ module Data.Git.Repository
         ( Git
         , HTree
         , HTreeEnt(..)
+        , getCommitMaybe
         , getCommit
+        , getTreeMaybe
         , getTree
         , rewrite
         , buildHTree
@@ -25,7 +27,7 @@ module Data.Git.Repository
 
 import Control.Applicative ((<$>))
 import Control.Monad
-import Control.Exception (Exception)
+import Control.Exception (Exception, throw)
 
 import Data.Maybe (fromMaybe)
 import Data.List (find)
@@ -60,12 +62,22 @@ mapJustM f (Just o) = f o
 mapJustM _ Nothing  = return Nothing
 
 -- | get a specified commit
-getCommit :: Git -> Ref -> IO (Maybe Commit)
-getCommit git ref = maybe Nothing objectToCommit <$> getObject git ref True
+getCommitMaybe :: Git -> Ref -> IO (Maybe Commit)
+getCommitMaybe git ref = maybe Nothing objectToCommit <$> getObject git ref True
+
+-- | get a specified commit but raises an exception if doesn't exists or type is not appropriate
+getCommit :: Git -> Ref -> IO Commit
+getCommit git ref = maybe err id . objectToCommit <$> getObject_ git ref True
+    where err = throw $ InvalidType ref TypeCommit
 
 -- | get a specified tree
-getTree :: Git -> Ref -> IO (Maybe Tree)
-getTree git ref = maybe Nothing objectToTree <$> getObject git ref True
+getTreeMaybe :: Git -> Ref -> IO (Maybe Tree)
+getTreeMaybe git ref = maybe Nothing objectToTree <$> getObject git ref True
+
+-- | get a specified tree but raise
+getTree :: Git -> Ref -> IO Tree
+getTree git ref = maybe err id . objectToTree <$> getObject_ git ref True
+    where err = throw $ InvalidType ref TypeTree
 
 -- | try to resolve a string to a specific commit ref
 -- for example: HEAD, HEAD^, master~3, shortRef
@@ -128,11 +140,7 @@ resolveRevision git (Revision prefix modifiers) =
               modf (RevModParentFirstN (n-1):xs) (head parentRefs)
           modf (_:_) _ = error "unimplemented revision modifier"
 
-          getParentRefs ref = do
-              obj <- getCommit git ref
-              case obj of
-                  Just (Commit { commitParents = parents }) -> return parents
-                  Nothing -> error "reference in commit chain doesn't exists"
+          getParentRefs ref = commitParents <$> getCommit git ref
 
 -- | returns a tree from a ref that might be either a commit, a tree or a tag.
 resolveTreeish :: Git -> Ref -> IO (Maybe Tree)
@@ -166,8 +174,8 @@ rewrite git mapCommit revision nbParent = do
     resolveParents nbParent ref >>= process . reverse
 
     where resolveParents :: Int -> Ref -> IO [ (Ref, Commit) ]
-          resolveParents 0 ref = (:[]) . (,) ref . fromMaybe (error "commit cannot be found") <$> getCommit git ref
-          resolveParents n ref = do commit <- fromMaybe (error "commit cannot be found") <$> getCommit git ref
+          resolveParents 0 ref = (:[]) . (,) ref <$> getCommit git ref
+          resolveParents n ref = do commit <- getCommit git ref
                                     case commitParents commit of
                                          [parentRef] -> liftM ((ref,commit) :) (resolveParents (n-1) parentRef)
                                          _           -> return [(ref,commit)]
@@ -189,13 +197,9 @@ buildHTree git (Tree ents) = mapM resolveTree ents
                 obj <- getObjectType git ref
                 case obj of
                         Just TypeBlob -> return (perm, ent, TreeFile ref)
-                        Just TypeTree -> do
-                                ctree <- getTree git ref
-                                case ctree of
-                                        Nothing -> error "unknown reference in tree object: no such child"
-                                        Just t  -> do
-                                                dir   <- buildHTree git t
-                                                return (perm, ent, TreeDir ref dir)
+                        Just TypeTree -> do ctree <- getTree git ref
+                                            dir   <- buildHTree git ctree
+                                            return (perm, ent, TreeDir ref dir)
                         Just _        -> error "wrong type embedded in tree object"
                         Nothing       -> error "unknown reference in tree object"
 
@@ -204,23 +208,17 @@ resolvePath :: Git            -- ^ repository
             -> Ref            -- ^ commit reference
             -> [ByteString]   -- ^ paths
             -> IO (Maybe Ref)
-resolvePath git commitRef paths = do
-        commit <- getCommit git commitRef
-        case commit of
-                Just (Commit { commitTreeish = tree }) -> resolve tree paths
-                Nothing                    -> error ("not a valid commit ref: " ++ show commitRef)
-        where
+resolvePath git commitRef paths =
+        getCommit git commitRef >>= \commit -> resolve (commitTreeish commit) paths
+    where
                 resolve :: Ref -> [ByteString] -> IO (Maybe Ref)
                 resolve treeRef []     = return $ Just treeRef
                 resolve treeRef (x:xs) = do
-                        tree <- getTree git treeRef
-                        case tree of
-                                Just (Tree ents) -> do
-                                        let cEnt = treeEntRef <$> findEnt x ents
-                                        if xs == []
-                                                then return cEnt
-                                                else maybe (return Nothing) (\z -> resolve z xs) cEnt
-                                Nothing          -> error ("not a valid tree ref: " ++ show treeRef)
+                        (Tree ents) <- getTree git treeRef
+                        let cEnt = treeEntRef <$> findEnt x ents
+                        if xs == []
+                            then return cEnt
+                            else maybe (return Nothing) (\z -> resolve z xs) cEnt
 
                 findEnt x = find (\(_, b, _) -> b == x)
                 treeEntRef (_,_,r) = r
