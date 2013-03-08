@@ -41,7 +41,7 @@ import Data.Char (isHexDigit)
 import Data.Data
 
 import Foreign.Storable
-import Control.Exception (Exception)
+import Control.Exception (Exception, throw)
 
 -- | represent a git reference (SHA1)
 newtype Ref = Ref ByteString
