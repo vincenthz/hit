@@ -20,6 +20,8 @@ module Data.Git.Storage
     , findRepo
     , isRepo
     , initRepo
+    , getDescription
+    , setDescription
     , iterateIndexes
     , findReference
     , findReferencesWithPrefix
@@ -157,6 +159,25 @@ initRepo path = do
                 [ "branches", "hooks", "info"
                 , "logs", "objects", "refs"
                 , "refs"</> "heads", "refs"</> "tags"]
+
+-- | read the repository description
+getDescription :: Git -> IO (Maybe String)
+getDescription git = do
+        isdescription <- isFile $ path </> "description"
+        if (isdescription)
+                then do
+                     content <- Prelude.readFile $ encodeString posix $ path </> "description"
+                     return $ Just content
+                else return Nothing
+        where
+                path = gitRepoPath git
+
+-- | set the repository dedescription
+setDescription :: Git -> String -> IO ()
+setDescription git desc = do
+        Prelude.writeFile (encodeString posix $ path </> "description") desc
+        where
+                path = gitRepoPath git
 
 iterateIndexes git f initAcc = do
         allIndexes    <- packIndexEnumerate (gitRepoPath git)
