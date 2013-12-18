@@ -69,7 +69,7 @@ data PackIndexReader = PackIndexReader PackIndexHeader FileReader
 -- | this is a cache representation of the packed-ref file
 type PackedRef = CacheFile (M.Map RefSpecTy Ref)
 
--- | represent an git repo, with possibly already opened filereaders
+-- | represent a git repo, with possibly already opened filereaders
 -- for indexes and packs
 data Git = Git
         { gitRepoPath  :: FilePath
