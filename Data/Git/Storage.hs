@@ -160,7 +160,7 @@ initRepo path = do
                 , "logs", "objects", "refs"
                 , "refs"</> "heads", "refs"</> "tags"]
 
--- | read the repository description
+-- | read the repository's description
 getDescription :: Git -> IO (Maybe String)
 getDescription git = do
         isdescription <- isFile $ path </> "description"
@@ -172,7 +172,7 @@ getDescription git = do
         where
                 path = gitRepoPath git
 
--- | set the repository dedescription
+-- | set the repository's description
 setDescription :: Git -> String -> IO ()
 setDescription git desc = do
         Prelude.writeFile (encodeString posix $ path </> "description") desc
