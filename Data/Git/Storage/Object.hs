@@ -59,8 +59,7 @@ import Data.Monoid
 import Data.Word
 import Text.Printf
 
-import Blaze.ByteString.Builder
-import Blaze.ByteString.Builder.Char8
+import Data.ByteString.Lazy.Builder hiding (word8)
 
 -- | location of an object in the database
 data ObjectLocation = NotFound | Loose Ref | Packed Ref Word64
@@ -238,47 +237,47 @@ objectWrite _                  = error "delta cannot be marshalled"
 
 treeWrite (Tree ents) = toLazyByteString $ mconcat $ concatMap writeTreeEnt ents
     where writeTreeEnt (perm,name,ref) =
-                [ fromString (printf "%o" perm)
-                , fromString " "
-                , fromByteString name
-                , fromString "\0"
-                , fromByteString $ toBinary ref
+                [ string7 (printf "%o" perm)
+                , string7 " "
+                , byteString name
+                , string7 "\0"
+                , byteString $ toBinary ref
                 ]
 
 commitWrite (Commit tree parents author committer encoding extra msg) =
     toLazyByteString $ mconcat els
     where
-          toNamedRef s r = mconcat [fromString s, fromByteString (toHex r),eol]
+          toNamedRef s r = mconcat [string7 s, byteString (toHex r),eol]
           toParent       = toNamedRef "parent "
           toCommitExtra :: CommitExtra -> [Builder]
-          toCommitExtra (CommitExtra k v) = [fromByteString k, eol] ++
-                                            (concatMap (\l -> [fromByteString " ", fromByteString l, eol]) $ linesLast v)
+          toCommitExtra (CommitExtra k v) = [byteString k, eol] ++
+                                            (concatMap (\l -> [byteString " ", byteString l, eol]) $ linesLast v)
 
           linesLast b
             | B.length b > 0 && B.last b == 0xa = BC.lines b ++ [ "" ]
             | otherwise                         = BC.lines b
           els = [toNamedRef "tree " tree ]
              ++ map toParent parents
-             ++ [fromByteString $ writeName "author" author, eol
-                ,fromByteString $ writeName "committer" committer, eol
-                ,maybe (fromByteString B.empty) (fromByteString) encoding -- FIXME need eol
+             ++ [byteString $ writeName "author" author, eol
+                ,byteString $ writeName "committer" committer, eol
+                ,maybe (byteString B.empty) (byteString) encoding -- FIXME need eol
                 ]
              ++ concatMap toCommitExtra extra
              ++ [eol
-                ,fromByteString msg
+                ,byteString msg
                 ]
 
 tagWrite (Tag ref ty tag tagger signature) =
     toLazyByteString $ mconcat els
-    where els = [ fromString "object ", fromByteString (toHex ref), eol
-                , fromString "type ", fromString (objectTypeMarshall ty), eol
-                , fromString "tag ", fromByteString tag, eol
-                , fromByteString $ writeName "tagger" tagger, eol
+    where els = [ string7 "object ", byteString (toHex ref), eol
+                , string7 "type ", string7 (objectTypeMarshall ty), eol
+                , string7 "tag ", byteString tag, eol
+                , byteString $ writeName "tagger" tagger, eol
                 , eol
-                , fromByteString signature
+                , byteString signature
                 ]
 
-eol = fromString "\n"
+eol = string7 "\n"
 
 blobWrite (Blob bData) = bData
 
