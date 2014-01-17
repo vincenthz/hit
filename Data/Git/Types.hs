@@ -21,6 +21,7 @@ module Data.Git.Types
     , GitTime(..)
     , toUTCTime
     , toPOSIXTime
+    , toZonedTime
     -- * Pack delta types
     , DeltaOfs(..)
     , DeltaRef(..)
@@ -36,6 +37,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.Git.Ref
 import Data.Git.Delta
 import Data.Time.Clock
+import Data.Time.LocalTime
 import Data.Time.Clock.POSIX
 import Data.Data
 
@@ -49,15 +51,23 @@ data ObjectType =
         | TypeDeltaRef
         deriving (Show,Eq,Data,Typeable)
 
--- | Git time is number of seconds since unix epoch
+-- | Git time is number of seconds since unix epoch with a timezone
 data GitTime = GitTime Integer Int
     deriving (Show,Eq)
 
 toUTCTime :: GitTime -> UTCTime
-toUTCTime (GitTime seconds _) = posixSecondsToUTCTime $ fromIntegral seconds
+toUTCTime = zonedTimeToUTC . toZonedTime
 
 toPOSIXTime :: GitTime -> POSIXTime
 toPOSIXTime = utcTimeToPOSIXSeconds . toUTCTime
+
+toZonedTime :: GitTime -> ZonedTime
+toZonedTime (GitTime epoch tzHourMin) = zonedTime
+  where tz        = minutesToTimeZone (signum h * minutes)
+        (h,m)     = tzHourMin `divMod` 100
+        minutes   = abs h * 60 + m
+        utcTime   = posixSecondsToUTCTime $ fromIntegral epoch
+        zonedTime = utcToZonedTime tz utcTime
 
 -- | the enum instance is useful when marshalling to pack file.
 instance Enum ObjectType where
