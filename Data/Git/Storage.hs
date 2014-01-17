@@ -163,21 +163,21 @@ initRepo path = do
 -- | read the repository's description
 getDescription :: Git -> IO (Maybe String)
 getDescription git = do
-        isdescription <- isFile $ path </> "description"
+        isdescription <- isFile descriptionPath
         if (isdescription)
                 then do
-                     content <- Prelude.readFile $ encodeString posix $ path </> "description"
+                     content <- Prelude.readFile $ encodeString posix descriptionPath
                      return $ Just content
                 else return Nothing
         where
-                path = gitRepoPath git
+                descriptionPath = (gitRepoPath git) </> "description"
 
 -- | set the repository's description
 setDescription :: Git -> String -> IO ()
 setDescription git desc = do
-        Prelude.writeFile (encodeString posix $ path </> "description") desc
+        Prelude.writeFile (encodeString posix descriptionPath) desc
         where
-                path = gitRepoPath git
+                descriptionPath = (gitRepoPath git) </> "description"
 
 iterateIndexes git f initAcc = do
         allIndexes    <- packIndexEnumerate (gitRepoPath git)
