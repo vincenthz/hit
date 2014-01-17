@@ -145,6 +145,21 @@ revList revision git = do
                     []    -> return ()
                     (p:_) -> loopTillEmpty p
 
+getLog revision git = do
+    ref    <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
+    commit <- getCommit git ref
+    printCommit ref commit
+  where printCommit ref commit = do
+            mapM_ putStrLn
+                [ ("commit: " ++ show ref)
+                , ("author: " ++ BC.unpack (personName author) ++ " <" ++ BC.unpack (personEmail author) ++ ">")
+                , ("date:   " ++ show (toZonedTime $ personTime author) ++ " (" ++ show (toUTCTime $ personTime author) ++ ")")
+                , ""
+                , BC.unpack $ commitMessage commit
+                ]
+            return ()
+          where author = commitAuthor commit
+
 main = do
     args <- getArgs
     case args of
@@ -153,6 +168,7 @@ main = do
         ["ls-tree",rev]      -> withCurrentRepo $ lsTree (fromString rev) ""
         ["ls-tree",rev,path] -> withCurrentRepo $ lsTree (fromString rev) path
         ["rev-list",rev]     -> withCurrentRepo $ revList (fromString rev)
+        ["log",rev]          -> withCurrentRepo $ getLog (fromString rev)
         cmd : [] -> error ("unknown command: " ++ cmd)
         []       -> error "no args"
         _        -> error "unknown command line arguments"
