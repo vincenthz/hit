@@ -20,6 +20,8 @@ module Data.Git.Storage
     , findRepo
     , isRepo
     , initRepo
+    , getDescription
+    , setDescription
     , iterateIndexes
     , findReference
     , findReferencesWithPrefix
@@ -69,7 +71,7 @@ data PackIndexReader = PackIndexReader PackIndexHeader FileReader
 -- | this is a cache representation of the packed-ref file
 type PackedRef = CacheFile (M.Map RefSpecTy Ref)
 
--- | represent an git repo, with possibly already opened filereaders
+-- | represent a git repo, with possibly already opened filereaders
 -- for indexes and packs
 data Git = Git
         { gitRepoPath  :: FilePath
@@ -157,6 +159,25 @@ initRepo path = do
                 [ "branches", "hooks", "info"
                 , "logs", "objects", "refs"
                 , "refs"</> "heads", "refs"</> "tags"]
+
+-- | read the repository's description
+getDescription :: Git -> IO (Maybe String)
+getDescription git = do
+        isdescription <- isFile $ path </> "description"
+        if (isdescription)
+                then do
+                     content <- Prelude.readFile $ encodeString posix $ path </> "description"
+                     return $ Just content
+                else return Nothing
+        where
+                path = gitRepoPath git
+
+-- | set the repository's description
+setDescription :: Git -> String -> IO ()
+setDescription git desc = do
+        Prelude.writeFile (encodeString posix $ path </> "description") desc
+        where
+                path = gitRepoPath git
 
 iterateIndexes git f initAcc = do
         allIndexes    <- packIndexEnumerate (gitRepoPath git)
