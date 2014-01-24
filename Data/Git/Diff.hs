@@ -155,20 +155,22 @@ getDiff :: Revision -- ^ commit revision
         -> IO [HitDiff]
 getDiff = getDiffWith defaultDiff []
 
--- | A defaiult diff helper. It is an example about how you can write your own
+-- | A default diff helper. It is an example about how you can write your own
 -- diff helper or you can use it if you want to get all of differences.
 defaultDiff :: BlobStateDiff -> [HitDiff] -> [HitDiff]
 defaultDiff (OnlyOld   old    ) acc = (HitDiff (bsFilename old) ([HitDiffDeletion old])):acc
 defaultDiff (OnlyNew       new) acc = (HitDiff (bsFilename new) ([HitDiffAddition new])):acc
 defaultDiff (OldAndNew old new) acc =
+    let theDiffMode = if (bsMode old) == (bsMode new) then [] else [HitDiffMode (bsMode old) (bsMode new)] in
     case ((bsRef old) == (bsRef new)) of
         -- If the reference is the same, then there is no difference
-        True  -> acc
-        False -> let theDiffMode = if (bsMode old) == (bsMode new) then [] else [HitDiffMode (bsMode old) (bsMode new)]
-                     theDiff = createANewDiff (bsContent old) (bsContent new)
-                 in  if (onlyBothDiff $ Prelude.head theDiff)
-                     then (HitDiff (bsFilename old) ((HitDiffRefs (bsRef old) (bsRef new)):theDiffMode)):acc
-                     else (HitDiff (bsFilename old) ( theDiff ++ ((HitDiffRefs (bsRef old) (bsRef new)):theDiffMode))):acc
+        True  -> if Prelude.null theDiffMode
+                 then acc
+                 else (HitDiff (bsFilename old) theDiffMode):acc
+        False -> let theDiff = createANewDiff (bsContent old) (bsContent new) in
+                 if (onlyBothDiff $ Prelude.head theDiff)
+                 then (HitDiff (bsFilename old) ((HitDiffRefs (bsRef old) (bsRef new)):theDiffMode)):acc
+                 else (HitDiff (bsFilename old) ( theDiff ++ ((HitDiffRefs (bsRef old) (bsRef new)):theDiffMode))):acc
     where
         createANewDiff :: BlobContent -> BlobContent -> [HitDiffContent]
         createANewDiff (FileContent   a) (FileContent   b) = [HitDiffChange (diff a b)]
