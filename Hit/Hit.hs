@@ -20,6 +20,7 @@ import Data.Git.Types
 import Data.Git.Ref
 import Data.Git.Repository
 import Data.Git.Revision
+import Data.Git.Diff
 import Data.Word
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8 as BC
@@ -27,6 +28,8 @@ import Text.Printf
 import qualified Data.Map as M
 import qualified Data.HashTable.IO as H
 import qualified Data.Hashable as Hashable
+
+import Data.Algorithm.Patience as AP (Item(..))
 
 type HashTable k v = H.CuckooHashTable k v
 
@@ -160,6 +163,54 @@ getLog revision git = do
             return ()
           where author = commitAuthor commit
 
+showDiff rev1 rev2 git = do
+    diffList <- getDiff rev1 rev2 git
+    mapM_ showADiff diffList
+    where
+        showADiff :: HitDiff -> IO ()
+        showADiff hd = do
+            let filename = BC.unpack $ hitFilename hd
+            putStrLn $ "Diff --hit old/" ++ filename ++ " new/" ++ filename
+            ppHitMode $ hitDiff hd
+            ppHitRefs $ hitDiff hd
+            ppHitDiff $ hitDiff hd
+
+        ppHitMode :: [HitDiffContent] -> IO ()
+        ppHitMode []                         = return ()
+        ppHitMode ((HitDiffMode old new):_ ) = printf "old mode %06o\nnew mode %06o\n" old new
+        ppHitMode (_                    :xs) = ppHitMode xs
+
+        ppHitRefs :: [HitDiffContent] -> IO ()
+        ppHitRefs []                         = return ()
+        ppHitRefs ((HitDiffRefs old new):_ ) = printf "--- old: %s\n+++ new: %s\n" (show old) (show new)
+        ppHitRefs ((HitDiffAddition new):_ ) = printf "--- old: dev/null\n+++ new: %s\n" (show $ bsRef new)
+        ppHitRefs ((HitDiffDeletion old):_ ) = printf "--- old: %s\n+++ new: dev/null\n" (show $ bsRef old)
+        ppHitRefs (_                    :xs) = ppHitRefs xs
+
+        ppHitDiff :: [HitDiffContent] -> IO ()
+        ppHitDiff []                         = return ()
+        ppHitDiff ((HitDiffAddition new):_ ) =
+            case bsContent new of
+                FileContent content -> printf "%s" (LC.unpack $ LC.concat $ doPPDiffLine "+" content)
+                _                   -> return ()
+        ppHitDiff ((HitDiffDeletion old):_ ) =
+            case bsContent old of
+                FileContent content -> printf "%s" (LC.unpack $ LC.concat $ doPPDiffLine "-" content)
+                _                   -> return ()
+        ppHitDiff ((HitDiffChange   l  ):_ ) = printf "%s" (LC.unpack $ LC.concat $ doPPDiff l)
+        ppHitDiff ((HitDiffBinChange   ):_ ) = putStrLn "Binary files differ"
+        ppHitDiff (_                    :xs) = ppHitDiff xs
+
+        doPPDiff :: [Item LC.ByteString] -> [LC.ByteString]
+        doPPDiff []              = []
+        doPPDiff ((Both a _):xs) = (doPPDiffLine " " [a]) ++ (doPPDiff xs)
+        doPPDiff ((Old  a  ):xs) = (doPPDiffLine "-" [a]) ++ (doPPDiff xs)
+        doPPDiff ((New    b):xs) = (doPPDiffLine "+" [b]) ++ (doPPDiff xs)
+
+        doPPDiffLine :: String -> [LC.ByteString] -> [LC.ByteString]
+        doPPDiffLine _      []     = []
+        doPPDiffLine prefix (a:xs) = (LC.concat [LC.pack prefix,a,LC.pack "\n"]):(doPPDiffLine prefix xs)
+
 main = do
     args <- getArgs
     case args of
@@ -169,6 +220,7 @@ main = do
         ["ls-tree",rev,path] -> withCurrentRepo $ lsTree (fromString rev) path
         ["rev-list",rev]     -> withCurrentRepo $ revList (fromString rev)
         ["log",rev]          -> withCurrentRepo $ getLog (fromString rev)
+        ["diff",rev1,rev2]   -> withCurrentRepo $ showDiff (fromString rev1) (fromString rev2)
         cmd : [] -> error ("unknown command: " ++ cmd)
         []       -> error "no args"
         _        -> error "unknown command line arguments"
