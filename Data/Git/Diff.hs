@@ -5,6 +5,8 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+-- Basic Git diff methods.
+--
 
 module Data.Git.Diff
     (
@@ -33,10 +35,13 @@ import Data.ByteString.Char8 as BS
 
 import Data.Algorithm.Patience as AP (Item(..), diff)
 
-data BlobContent = FileContent [L.ByteString] | BinaryContent L.ByteString
+-- | represents a blob's content (i.e., the content of a file at a given
+-- reference).
+data BlobContent = FileContent [L.ByteString] -- ^ Text file's lines
+                 | BinaryContent L.ByteString -- ^ Binary content
     deriving (Show)
 
--- | This is a blob description.
+-- | This is a blob description at a given state (revision)
 data BlobState = BlobState
     { bsFilename :: BS.ByteString
     , bsMode     :: Int
@@ -44,14 +49,21 @@ data BlobState = BlobState
     , bsContent  :: BlobContent
     }
     deriving (Show)
+
+-- | Two 'BlobState' are equal if they have the same filename, i.e.,
+--
+-- > ((BlobState x _ _ _) == (BlobState y _ _ _)) = (x == y)
 instance Eq BlobState where
     (BlobState f1 _ _ _) == (BlobState f2 _ _ _) = (f2 == f1)
     a /= b = not (a == b)
 
--- | Represents a file state between two references
-data BlobStateDiff = OnlyOld BlobState
-                   | OnlyNew BlobState
-                   | OldAndNew  BlobState BlobState
+-- | Represents a file state between two revisions
+-- A file (a blob) can be present in the first Tree's revision but not in the
+-- second one, then it has been deleted. If only in the second Tree's revision,
+-- then it has been created. If it is in the both, maybe it has been changed.
+data BlobStateDiff = OnlyOld   BlobState
+                   | OnlyNew   BlobState
+                   | OldAndNew BlobState BlobState
 
 getBinaryStat :: L.ByteString -> Double
 getBinaryStat bs = L.foldl' (\acc w -> acc + if isBin $ ord w then 1 else 0) 0 bs / (fromIntegral $ L.length bs)
@@ -100,12 +112,19 @@ buildListForDiff git revision = do
                 Just obj -> return $ oiData obj
 
 -- | generate a diff list between two revisions with a given diff helper.
--- Useful to extract any kind of information from two different revisions:
+--
+-- Useful to extract any kind of information from two different revisions.
 -- For example you can get the number of deleted files:
---    getDiffWith f 0 HEAD^ HEAD git
---    where f (OnlyOld _) acc = acc+1
---          f _           acc = acc
--- you even can get a 'full' diff: see defaultDiff
+--
+-- > getdiffwith f 0 head^ head git
+-- >     where f (OnlyOld _) acc = acc+1
+-- >           f _           acc = acc
+--
+-- Or save the list of new files:
+--
+-- > getdiffwith f [] head^ head git
+-- >     where f (OnlyNew bs) acc = (bsFilename bs):acc
+-- >           f _            acc = acc
 getDiffWith :: (BlobStateDiff -> a -> a) -- ^ diff helper (State -> accumulator -> accumulator)
             -> a                         -- ^ accumulator
             -> Revision                  -- ^ commit revision
@@ -148,7 +167,8 @@ data HitDiff = HitDiff
 
 -- | A default Diff getter which returns all diff information (Mode, Content
 -- and Binary).
--- gitDiff = getDiffWith defaultDiff
+--
+-- > getDiff = getDiffWith defaultDiff
 getDiff :: Revision -- ^ commit revision
         -> Revision -- ^ commit revision
         -> Git      -- ^ repository
