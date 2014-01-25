@@ -1,5 +1,5 @@
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 -- |
 -- Module      : Data.Git.Storage.Object
 -- License     : BSD-style
@@ -59,7 +59,21 @@ import Data.Monoid
 import Data.Word
 import Text.Printf
 
+#if MIN_VERSION_bytestring(0,10,0)
 import Data.ByteString.Lazy.Builder hiding (word8)
+#else
+import qualified Data.ByteString.Lazy.Char8 as LC
+
+-- tiny builder interface like for bytestring < 0.10 that
+-- use normal lazy bytestring concat.
+string7 :: String -> L.ByteString
+string7 = LC.pack
+
+byteString :: ByteString -> L.ByteString
+byteString = LC.fromChunks . (:[])
+
+toLazyByteString = id
+#endif
 
 -- | location of an object in the database
 data ObjectLocation = NotFound | Loose Ref | Packed Ref Word64
@@ -249,7 +263,6 @@ commitWrite (Commit tree parents author committer encoding extra msg) =
     where
           toNamedRef s r = mconcat [string7 s, byteString (toHex r),eol]
           toParent       = toNamedRef "parent "
-          toCommitExtra :: CommitExtra -> [Builder]
           toCommitExtra (CommitExtra k v) = [byteString k, eol] ++
                                             (concatMap (\l -> [byteString " ", byteString l, eol]) $ linesLast v)
 
