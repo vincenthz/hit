@@ -164,7 +164,7 @@ getLog revision git = do
           where author = commitAuthor commit
 
 showDiff rev1 rev2 git = do
-    diffList <- getDiff rev1 rev2 git
+    diffList <- getDiffFromRev rev1 rev2 git
     mapM_ showADiff diffList
     where
         showADiff :: HitDiff -> IO ()

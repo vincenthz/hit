@@ -15,11 +15,13 @@ module Data.Git.Diff
     , BlobState(..)
     , BlobStateDiff(..)
     , getDiffWith
+    , getDiffWithFromRev
     -- * Default helpers
     , HitDiffContent(..)
     , HitDiff(..)
     , defaultDiff
     , getDiff
+    , getDiffFromRev
     ) where
 
 import Control.Applicative ((<$>))
@@ -80,9 +82,8 @@ isBinaryFile file =
     let bs = L.take 512 file
     in  getBinaryStat bs > 0.0
 
-buildListForDiff :: Git -> Revision -> IO [BlobState]
-buildListForDiff git revision = do
-    ref    <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
+buildListForDiff :: Git -> Ref -> IO [BlobState]
+buildListForDiff git ref = do
     commit <- getCommit git ref
     tree   <- resolveTreeish git $ commitTreeish commit
     case tree of
@@ -105,8 +106,8 @@ buildListForDiff git revision = do
             return $ l1 ++ l2
 
         catBlobFile :: Ref -> IO L.ByteString
-        catBlobFile ref = do
-            mobj <- getObjectRaw git ref True
+        catBlobFile blobRef = do
+            mobj <- getObjectRaw git blobRef True
             case mobj of
                 Nothing  -> error "not a valid object"
                 Just obj -> return $ oiData obj
@@ -127,13 +128,13 @@ buildListForDiff git revision = do
 -- >           f _            acc = acc
 getDiffWith :: (BlobStateDiff -> a -> a) -- ^ diff helper (State -> accumulator -> accumulator)
             -> a                         -- ^ accumulator
-            -> Revision                  -- ^ commit revision
-            -> Revision                  -- ^ commit revision
+            -> Ref                       -- ^ commit revision
+            -> Ref                       -- ^ commit revision
             -> Git                       -- ^ repository
             -> IO a
-getDiffWith f acc rev1 rev2 git = do
-    commit1 <- buildListForDiff git rev1
-    commit2 <- buildListForDiff git rev2
+getDiffWith f acc ref1 ref2 git = do
+    commit1 <- buildListForDiff git ref1
+    commit2 <- buildListForDiff git ref2
     return $ Prelude.foldr f acc $ doDiffWith commit1 commit2
     where
         doDiffWith :: [BlobState] -> [BlobState] -> [BlobStateDiff]
@@ -147,7 +148,16 @@ getDiffWith f acc rev1 rev2 git = do
                                 in  (OldAndNew bs1 bs2):(doDiffWith xs1 subxs2)
                     Nothing  -> (OnlyOld bs1):(doDiffWith xs1 xs2)
 
-
+getDiffWithFromRev :: (BlobStateDiff -> a -> a) -- ^ diff helper (State -> accumulator -> accumulator)
+                   -> a                         -- ^ accumulator
+                   -> Revision                  -- ^ commit revision
+                   -> Revision                  -- ^ commit revision
+                   -> Git                       -- ^ repository
+                   -> IO a
+getDiffWithFromRev f acc rev1 rev2 git = do
+    ref1 <- maybe (error "revision cannot be found") id <$> resolveRevision git rev1
+    ref2 <- maybe (error "revision cannot be found") id <$> resolveRevision git rev2
+    getDiffWith f acc ref1 ref2 git
 
 -- | This is an example of how you can use Hit to get all of information
 -- between different revision.
@@ -169,11 +179,17 @@ data HitDiff = HitDiff
 -- and Binary).
 --
 -- > getDiff = getDiffWith defaultDiff
-getDiff :: Revision -- ^ commit revision
-        -> Revision -- ^ commit revision
-        -> Git      -- ^ repository
+getDiff :: Ref -- ^ commit ref
+        -> Ref -- ^ commit ref
+        -> Git -- ^ repository
         -> IO [HitDiff]
 getDiff = getDiffWith defaultDiff []
+
+getDiffFromRev :: Revision -- ^ commit revision
+               -> Revision -- ^ commit revision
+               -> Git      -- ^ repository
+               -> IO [HitDiff]
+getDiffFromRev = getDiffWithFromRev defaultDiff []
 
 -- | A default diff helper. It is an example about how you can write your own
 -- diff helper or you can use it if you want to get all of differences.
