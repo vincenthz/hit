@@ -9,21 +9,21 @@
 -- Portability : unix
 --
 module Data.Git.Repository
-        ( Git
-        , HTree
-        , HTreeEnt(..)
-        , getCommitMaybe
-        , getCommit
-        , getTreeMaybe
-        , getTree
-        , rewrite
-        , buildHTree
-        , resolvePath
-        , resolveTreeish
-        , resolveRevision
-        , initRepo
-        , isRepo
-        ) where
+    ( Git
+    , HTree
+    , HTreeEnt(..)
+    , getCommitMaybe
+    , getCommit
+    , getTreeMaybe
+    , getTree
+    , rewrite
+    , buildHTree
+    , resolvePath
+    , resolveTreeish
+    , resolveRevision
+    , initRepo
+    , isRepo
+    ) where
 
 import Control.Applicative ((<$>))
 import Control.Monad

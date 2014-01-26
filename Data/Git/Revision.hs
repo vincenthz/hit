@@ -20,12 +20,12 @@ import Data.Data
 -- | A modifier to a revision, which is
 -- a function apply of a revision
 data RevModifier =
-          RevModParent Int       -- ^ parent accessor ^<n> and ^
-        | RevModParentFirstN Int -- ^ parent accessor ~<n>
-        | RevModAtType String    -- ^ @{type} accessor
-        | RevModAtDate String    -- ^ @{date} accessor
-        | RevModAtN Int          -- ^ @{n} accessor
-        deriving (Eq,Data,Typeable)
+      RevModParent Int       -- ^ parent accessor ^<n> and ^
+    | RevModParentFirstN Int -- ^ parent accessor ~<n>
+    | RevModAtType String    -- ^ @{type} accessor
+    | RevModAtDate String    -- ^ @{date} accessor
+    | RevModAtN Int          -- ^ @{n} accessor
+    deriving (Eq,Data,Typeable)
 
 instance Show RevModifier where
     show (RevModParent 1)       = "^"
@@ -44,11 +44,11 @@ instance Show RevModifier where
 --    * type
 --    * date
 data Revision = Revision String [RevModifier]
-        deriving (Eq,Data,Typeable)
+    deriving (Eq,Data,Typeable)
 
 -- | Exception when a revision cannot be resolved to a reference
 data RevisionNotFound = RevisionNotFound Revision
-        deriving (Show,Eq,Data,Typeable)
+    deriving (Show,Eq,Data,Typeable)
 
 instance Show Revision where
     show (Revision s ms) = s ++ concatMap show ms
@@ -56,8 +56,8 @@ instance Show Revision where
 instance IsString Revision where
     fromString = revFromString
 
-revFromString s = either (error.show) id $ parse parser "" s where
-        parser = do
+revFromString s = either (error.show) id $ parse parser "" s
+  where parser = do
                 p    <- many (noneOf "^~@")
                 mods <- many (choice [parseParent, parseFirstParent, parseAt])
                 return $ Revision p mods

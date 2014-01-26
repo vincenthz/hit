@@ -43,13 +43,13 @@ import Data.Data
 
 -- | type of a git object.
 data ObjectType =
-          TypeTree
-        | TypeBlob
-        | TypeCommit
-        | TypeTag
-        | TypeDeltaOff
-        | TypeDeltaRef
-        deriving (Show,Eq,Data,Typeable)
+      TypeTree
+    | TypeBlob
+    | TypeCommit
+    | TypeTag
+    | TypeDeltaOff
+    | TypeDeltaRef
+    deriving (Show,Eq,Data,Typeable)
 
 -- | Git time is number of seconds since unix epoch with a timezone
 data GitTime = GitTime Integer Int
@@ -71,20 +71,20 @@ toZonedTime (GitTime epoch tzHourMin) = zonedTime
 
 -- | the enum instance is useful when marshalling to pack file.
 instance Enum ObjectType where
-        fromEnum TypeCommit   = 0x1
-        fromEnum TypeTree     = 0x2
-        fromEnum TypeBlob     = 0x3
-        fromEnum TypeTag      = 0x4
-        fromEnum TypeDeltaOff = 0x6
-        fromEnum TypeDeltaRef = 0x7
+    fromEnum TypeCommit   = 0x1
+    fromEnum TypeTree     = 0x2
+    fromEnum TypeBlob     = 0x3
+    fromEnum TypeTag      = 0x4
+    fromEnum TypeDeltaOff = 0x6
+    fromEnum TypeDeltaRef = 0x7
 
-        toEnum 0x1 = TypeCommit
-        toEnum 0x2 = TypeTree
-        toEnum 0x3 = TypeBlob
-        toEnum 0x4 = TypeTag
-        toEnum 0x6 = TypeDeltaOff
-        toEnum 0x7 = TypeDeltaRef
-        toEnum n   = error ("not a valid object: " ++ show n)
+    toEnum 0x1 = TypeCommit
+    toEnum 0x2 = TypeTree
+    toEnum 0x3 = TypeBlob
+    toEnum 0x4 = TypeTag
+    toEnum 0x6 = TypeDeltaOff
+    toEnum 0x7 = TypeDeltaRef
+    toEnum n   = error ("not a valid object: " ++ show n)
 
 -- | represent one entry in the tree
 -- (permission,file or directory name,blob or tree ref)
@@ -114,14 +114,14 @@ data Blob = Blob { blobGetContent :: L.ByteString } deriving (Show,Eq)
 
 -- | Represent a commit object.
 data Commit = Commit
-        { commitTreeish   :: Ref
-        , commitParents   :: [Ref]
-        , commitAuthor    :: Person
-        , commitCommitter :: Person
-        , commitEncoding  :: Maybe ByteString
-        , commitExtras    :: [CommitExtra]
-        , commitMessage   :: ByteString
-        } deriving (Show,Eq)
+    { commitTreeish   :: Ref
+    , commitParents   :: [Ref]
+    , commitAuthor    :: Person
+    , commitCommitter :: Person
+    , commitEncoding  :: Maybe ByteString
+    , commitExtras    :: [CommitExtra]
+    , commitMessage   :: ByteString
+    } deriving (Show,Eq)
 
 data CommitExtra = CommitExtra
     { commitExtraKey   :: ByteString
@@ -130,17 +130,17 @@ data CommitExtra = CommitExtra
 
 -- | Represent a signed tag.
 data Tag = Tag
-        { tagRef        :: Ref
-        , tagObjectType :: ObjectType
-        , tagBlob       :: ByteString
-        , tagName       :: Person
-        , tagS          :: ByteString
-        } deriving (Show,Eq)
+    { tagRef        :: Ref
+    , tagObjectType :: ObjectType
+    , tagBlob       :: ByteString
+    , tagName       :: Person
+    , tagS          :: ByteString
+    } deriving (Show,Eq)
 
 -- | Delta pointing to an offset.
 data DeltaOfs = DeltaOfs Word64 Delta
-        deriving (Show,Eq)
+    deriving (Show,Eq)
 
 -- | Delta pointing to a ref.
 data DeltaRef = DeltaRef Ref Delta
-        deriving (Show,Eq)
+    deriving (Show,Eq)
