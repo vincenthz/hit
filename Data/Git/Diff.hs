@@ -22,8 +22,6 @@ module Data.Git.Diff
     , getDiff
     ) where
 
-import Control.Applicative ((<$>))
-
 import Data.List (find, filter)
 import Data.Char (ord)
 import Data.Git
