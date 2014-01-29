@@ -126,8 +126,8 @@ buildListForDiff git ref = do
 -- >           f _            acc = acc
 getDiffWith :: (BlobStateDiff -> a -> a) -- ^ diff helper (State -> accumulator -> accumulator)
             -> a                         -- ^ accumulator
-            -> Ref                       -- ^ commit revision
-            -> Ref                       -- ^ commit revision
+            -> Ref                       -- ^ commit reference (the original state)
+            -> Ref                       -- ^ commit reference (the new state)
             -> Git                       -- ^ repository
             -> IO a
 getDiffWith f acc ref1 ref2 git = do
