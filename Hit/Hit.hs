@@ -164,7 +164,9 @@ getLog revision git = do
           where author = commitAuthor commit
 
 showDiff rev1 rev2 git = do
-    diffList <- getDiffFromRev rev1 rev2 git
+    ref1 <- maybe (error "revision cannot be found") id <$> resolveRevision git rev1
+    ref2 <- maybe (error "revision cannot be found") id <$> resolveRevision git rev2
+    diffList <- getDiff ref1 ref2 git
     mapM_ showADiff diffList
     where
         showADiff :: HitDiff -> IO ()
