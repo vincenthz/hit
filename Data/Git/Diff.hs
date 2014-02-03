@@ -66,21 +66,6 @@ data BlobStateDiff = OnlyOld   BlobState
                    | OnlyNew   BlobState
                    | OldAndNew BlobState BlobState
 
-getBinaryStat :: L.ByteString -> Double
-getBinaryStat bs = L.foldl' (\acc w -> acc + if isBin $ ord w then 1 else 0) 0 bs / (fromIntegral $ L.length bs)
-    where
-        isBin :: Int -> Bool
-        isBin i
-            | i >= 0 && i <= 8   = True
-            | i == 12            = True
-            | i >= 14 && i <= 31 = True
-            | otherwise          = False
-
-isBinaryFile :: L.ByteString -> Bool
-isBinaryFile file =
-    let bs = L.take 512 file
-    in  getBinaryStat bs > 0.0
-
 buildListForDiff :: Git -> Ref -> IO [BlobState]
 buildListForDiff git ref = do
     commit <- getCommit git ref
@@ -110,6 +95,19 @@ buildListForDiff git ref = do
             case mobj of
                 Nothing  -> error "not a valid object"
                 Just obj -> return $ oiData obj
+        getBinaryStat :: L.ByteString -> Double
+        getBinaryStat bs = L.foldl' (\acc w -> acc + if isBin $ ord w then 1 else 0) 0 bs / (fromIntegral $ L.length bs)
+            where
+                isBin :: Int -> Bool
+                isBin i
+                    | i >= 0 && i <= 8   = True
+                    | i == 12            = True
+                    | i >= 14 && i <= 31 = True
+                    | otherwise          = False
+
+        isBinaryFile :: L.ByteString -> Bool
+        isBinaryFile file = let bs = L.take 512 file
+                            in  getBinaryStat bs > 0.0
 
 -- | generate a diff list between two revisions with a given diff helper.
 --
@@ -200,14 +198,14 @@ defaultDiff _ (OnlyOld   old    ) acc =
         oldRef     = OldRef  (bsRef  old)
         oldContent = case bsContent old of
                          BinaryContent _ -> OldBinaryFile
-                         FileContent   l -> OldTextFile (Prelude.zipWith addLines [1..] l)
+                         FileContent   l -> OldTextFile (Prelude.zipWith TextLine [1..] l)
     in (HitDiff (bsFilename old) oldContent oldMode oldRef):acc
 defaultDiff _ (OnlyNew       new) acc =
     let newMode    = NewMode (bsMode new)
         newRef     = NewRef  (bsRef  new)
         newContent = case bsContent new of
                          BinaryContent _ -> NewBinaryFile
-                         FileContent   l -> NewTextFile (Prelude.zipWith addLines [1..] l)
+                         FileContent   l -> NewTextFile (Prelude.zipWith TextLine [1..] l)
     in (HitDiff (bsFilename new) newContent newMode newRef):acc
 defaultDiff context (OldAndNew old new) acc =
     let mode = if (bsMode old) /= (bsMode new) then ModifiedMode (bsMode old) (bsMode new)
@@ -223,13 +221,10 @@ defaultDiff context (OldAndNew old new) acc =
 
           createDiff :: BlobContent -> BlobContent -> HitFileContent
           createDiff (FileContent a) (FileContent b) =
-              let linesA = Prelude.zipWith addLines [1..] a
-                  linesB = Prelude.zipWith addLines [1..] b
+              let linesA = Prelude.zipWith TextLine [1..] a
+                  linesB = Prelude.zipWith TextLine [1..] b
               in ModifiedFile $ diffGetContext context (diff linesA linesB)
           createDiff _ _ = ModifiedBinaryFile
-
-addLines :: Integer -> L.ByteString -> TextLine
-addLines a b = TextLine a b
 
 data HitwebAccu = AccuBottom | AccuTop
 diffGetContext :: Int -> [Item TextLine] -> [FilteredDiff]
