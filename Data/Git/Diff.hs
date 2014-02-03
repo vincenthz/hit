@@ -16,10 +16,13 @@ module Data.Git.Diff
     , BlobStateDiff(..)
     , getDiffWith
     -- * Default helpers
-    , HitDiffContent(..)
     , HitDiff(..)
+    , HitFileContent(..)
+    , FilteredDiff(..)
+    , HitFileRef(..)
+    , HitFileMode(..)
+    , TextLine(..)
     , defaultDiff
-    , getDiff
     ) where
 
 import Data.List (find, filter)
@@ -144,57 +147,123 @@ getDiffWith f acc ref1 ref2 git = do
                                 in  (OldAndNew bs1 bs2):(doDiffWith xs1 subxs2)
                     Nothing  -> (OnlyOld bs1):(doDiffWith xs1 xs2)
 
--- | This is an example of how you can use Hit to get all of information
--- between different revision.
-data HitDiffContent = HitDiffAddition  BlobState
-                    | HitDiffDeletion  BlobState
-                    | HitDiffChange    [AP.Item L.ByteString]
-                    | HitDiffBinChange
-                    | HitDiffMode      Int Int
-                    | HitDiffRefs      Ref Ref
-    deriving (Show)
+data TextLine = TextLine
+    { lineNumber  :: Integer
+    , lineContent :: L.ByteString
+    }
+instance Eq TextLine where
+  a == b = (lineContent a) == (lineContent b)
+  a /= b = not (a == b)
+instance Ord TextLine where
+  compare a b = compare (lineContent a) (lineContent b)
+  a <  b     = (lineContent a) < (lineContent b)
+  a <= b     = (lineContent a) <= (lineContent b)
+  a >  b     = b < a
+  a >= b     = b <= a
 
--- | This represents a diff.
+data FilteredDiff = NormalLine (Item TextLine) | Separator
+
+data HitFileContent = NewBinaryFile
+                    | OldBinaryFile
+                    | NewTextFile  [TextLine]
+                    | OldTextFile  [TextLine]
+                    | ModifiedBinaryFile
+                    | ModifiedFile [FilteredDiff]
+                    | UnModifiedFile
+
+data HitFileMode = NewMode        Int
+                 | OldMode        Int
+                 | ModifiedMode   Int Int
+                 | UnModifiedMode Int
+
+data HitFileRef = NewRef        Ref
+                | OldRef        Ref
+                | ModifiedRef   Ref Ref
+                | UnModifiedRef Ref
+
+-- | This is a proposed diff records for a given file.
+-- It contains useful information:
+--   * the filename (with its path in the root project)
+--   * a file diff (with the Data.Algorythm.Patience method)
+--   * the file's mode (i.e. the file priviledge)
+--   * the file's ref
 data HitDiff = HitDiff
-    { hitFilename :: BS.ByteString
-    , hitDiff     :: [HitDiffContent]
-    } deriving (Show)
+    { hFileName    :: BS.ByteString
+    , hFileContent :: HitFileContent
+    , hFileMode    :: HitFileMode
+    , hFileRef     :: HitFileRef
+    }
 
--- | A default Diff getter which returns all diff information (Mode, Content
--- and Binary).
---
--- > getDiff = getDiffWith defaultDiff
-getDiff :: Ref -- ^ commit ref
-        -> Ref -- ^ commit ref
-        -> Git -- ^ repository
-        -> IO [HitDiff]
-getDiff = getDiffWith defaultDiff []
+defaultDiff :: Int -> BlobStateDiff -> [HitDiff] -> [HitDiff]
+defaultDiff _ (OnlyOld   old    ) acc =
+    let oldMode    = OldMode (bsMode old)
+        oldRef     = OldRef  (bsRef  old)
+        oldContent = case bsContent old of
+                         BinaryContent _ -> OldBinaryFile
+                         FileContent   l -> OldTextFile (Prelude.zipWith addLines [1..] l)
+    in (HitDiff (bsFilename old) oldContent oldMode oldRef):acc
+defaultDiff _ (OnlyNew       new) acc =
+    let newMode    = NewMode (bsMode new)
+        newRef     = NewRef  (bsRef  new)
+        newContent = case bsContent new of
+                         BinaryContent _ -> NewBinaryFile
+                         FileContent   l -> NewTextFile (Prelude.zipWith addLines [1..] l)
+    in (HitDiff (bsFilename new) newContent newMode newRef):acc
+defaultDiff context (OldAndNew old new) acc =
+    let mode = if (bsMode old) /= (bsMode new) then ModifiedMode (bsMode old) (bsMode new)
+                                               else UnModifiedMode (bsMode new)
+        ref = if (bsRef old) == (bsRef new) then UnModifiedRef (bsRef new)
+                                            else ModifiedRef (bsRef old) (bsRef new)
+    in case (mode, ref) of
+           ((UnModifiedMode _), (UnModifiedRef _)) -> acc
+           _ -> (HitDiff (bsFilename new) (content ref) mode ref):acc
+    where content :: HitFileRef -> HitFileContent
+          content (UnModifiedRef _) = UnModifiedFile
+          content _                 = createDiff (bsContent old) (bsContent new)
 
--- | A default diff helper. It is an example about how you can write your own
--- diff helper or you can use it if you want to get all of differences.
-defaultDiff :: BlobStateDiff -> [HitDiff] -> [HitDiff]
-defaultDiff (OnlyOld   old    ) acc = (HitDiff (bsFilename old) ([HitDiffDeletion old])):acc
-defaultDiff (OnlyNew       new) acc = (HitDiff (bsFilename new) ([HitDiffAddition new])):acc
-defaultDiff (OldAndNew old new) acc =
-    let theDiffMode = if (bsMode old) == (bsMode new) then [] else [HitDiffMode (bsMode old) (bsMode new)] in
-    case ((bsRef old) == (bsRef new)) of
-        -- If the reference is the same, then there is no difference
-        True  -> if Prelude.null theDiffMode
-                 then acc
-                 else (HitDiff (bsFilename old) theDiffMode):acc
-        False -> let theDiff = createANewDiff (bsContent old) (bsContent new) in
-                 if (onlyBothDiff $ Prelude.head theDiff)
-                 then (HitDiff (bsFilename old) ((HitDiffRefs (bsRef old) (bsRef new)):theDiffMode)):acc
-                 else (HitDiff (bsFilename old) ( theDiff ++ ((HitDiffRefs (bsRef old) (bsRef new)):theDiffMode))):acc
-    where
-        createANewDiff :: BlobContent -> BlobContent -> [HitDiffContent]
-        createANewDiff (FileContent   a) (FileContent   b) = [HitDiffChange (diff a b)]
-        createANewDiff (BinaryContent a) (BinaryContent b) = if a /= b then [HitDiffBinChange] else []
-        createANewDiff _                 _                 = [HitDiffBinChange]
+          createDiff :: BlobContent -> BlobContent -> HitFileContent
+          createDiff (FileContent a) (FileContent b) =
+              let linesA = Prelude.zipWith addLines [1..] a
+                  linesB = Prelude.zipWith addLines [1..] b
+              in ModifiedFile $ diffGetContext context (diff linesA linesB)
+          createDiff _ _ = ModifiedBinaryFile
 
-        onlyBothDiff :: HitDiffContent -> Bool
-        onlyBothDiff (HitDiffBinChange) = False
-        onlyBothDiff (HitDiffChange l)  = Prelude.all predicate l
-            where predicate (Both _ _) = True
-                  predicate _          = False
-        onlyBothDiff _                  = True
+addLines :: Integer -> L.ByteString -> TextLine
+addLines a b = TextLine a b
+
+data HitwebAccu = AccuBottom | AccuTop
+diffGetContext :: Int -> [Item TextLine] -> [FilteredDiff]
+diffGetContext 0 list = fmap NormalLine list
+diffGetContext context list =
+    let (_, _, filteredDiff) = Prelude.foldr filterContext (0, AccuBottom, []) list
+        theList = removeTrailingBoth filteredDiff
+    in case Prelude.head theList of
+        (NormalLine (Both l1 _)) -> if (lineNumber l1) > 1 then Separator:theList
+                                                           else theList
+        _ -> theList
+    where filterContext :: (Item TextLine) -> (Int, HitwebAccu, [FilteredDiff]) -> (Int, HitwebAccu, [FilteredDiff])
+          filterContext (Both l1 l2) (c, AccuBottom, acc) =
+              if c < context then (c+1, AccuBottom, (NormalLine (Both l1 l2)):acc)
+                             else (c  , AccuBottom, (NormalLine (Both l1 l2))
+                                                    :((Prelude.take (context-1) acc)
+                                                    ++ [Separator]
+                                                    ++ (Prelude.drop (context+1) acc)))
+          filterContext (Both l1 l2) (c, AccuTop, acc) =
+              if c < context then (c+1, AccuTop   , (NormalLine (Both l1 l2)):acc)
+                             else (0  , AccuBottom, (NormalLine (Both l1 l2)):acc)
+          filterContext element (_, _, acc) =
+              (0, AccuTop, (NormalLine element):acc)
+
+          startWithSeparator :: [FilteredDiff] -> Bool
+          startWithSeparator [] = False
+          startWithSeparator (Separator:_) = True
+          startWithSeparator ((NormalLine l):xs) =
+              case l of
+                  (Both _ _) -> startWithSeparator xs
+                  _          -> False
+
+          removeTrailingBoth :: [FilteredDiff] -> [FilteredDiff]
+          removeTrailingBoth diffList =
+              let test = startWithSeparator diffList
+              in  if test then Prelude.tail $ Prelude.dropWhile (\a -> not $ startWithSeparator [a]) diffList
+                          else diffList
