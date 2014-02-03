@@ -23,6 +23,7 @@ module Data.Git.Diff
     , HitFileMode(..)
     , TextLine(..)
     , defaultDiff
+    , getDiff
     ) where
 
 import Data.List (find, filter)
@@ -192,7 +193,22 @@ data HitDiff = HitDiff
     , hFileRef     :: HitFileRef
     }
 
-defaultDiff :: Int -> BlobStateDiff -> [HitDiff] -> [HitDiff]
+-- | A default Diff getter which returns all diff information (Mode, Content
+-- and Binary) with a context of 5 lines.
+--
+-- > getDiff = getDiffWith (defaultDiff 5) []
+getDiff :: Ref
+        -> Ref
+        -> Git
+        -> IO [HitDiff]
+getDiff = getDiffWith (defaultDiff 5) []
+
+-- | A default diff helper. It is an example about how you can write your own
+-- diff helper or you can use it if you want to get all of differences.
+defaultDiff :: Int           -- ^ Number of line for context
+            -> BlobStateDiff
+            -> [HitDiff]     -- ^ Accumulator
+            -> [HitDiff]     -- ^ Accumulator with a new content
 defaultDiff _ (OnlyOld   old    ) acc =
     let oldMode    = OldMode (bsMode old)
         oldRef     = OldRef  (bsRef  old)
@@ -226,7 +242,10 @@ defaultDiff context (OldAndNew old new) acc =
               in ModifiedFile $ diffGetContext context (diff linesA linesB)
           createDiff _ _ = ModifiedBinaryFile
 
+-- Used by diffGetContext
 data HitwebAccu = AccuBottom | AccuTop
+
+-- Context filter
 diffGetContext :: Int -> [Item TextLine] -> [FilteredDiff]
 diffGetContext 0 list = fmap NormalLine list
 diffGetContext context list =
@@ -236,7 +255,10 @@ diffGetContext context list =
         (NormalLine (Both l1 _)) -> if (lineNumber l1) > 1 then Separator:theList
                                                            else theList
         _ -> theList
-    where filterContext :: (Item TextLine) -> (Int, HitwebAccu, [FilteredDiff]) -> (Int, HitwebAccu, [FilteredDiff])
+    where -- only keep 'context'. The file is annalyzed from the bottom to the top.
+          -- The accumulator here is a tuple3 with (the line counter, the
+          -- direction and the list of elements)
+          filterContext :: (Item TextLine) -> (Int, HitwebAccu, [FilteredDiff]) -> (Int, HitwebAccu, [FilteredDiff])
           filterContext (Both l1 l2) (c, AccuBottom, acc) =
               if c < context then (c+1, AccuBottom, (NormalLine (Both l1 l2)):acc)
                              else (c  , AccuBottom, (NormalLine (Both l1 l2))
