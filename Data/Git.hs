@@ -16,6 +16,13 @@ module Data.Git
     , Blob(..)
     , Tag(..)
     , GitTime(..)
+    , ModePerm(..)
+
+    -- * Helper & type related to ModePerm
+    , ObjectFileType(..)
+    , FilePermissions(..)
+    , getPermission
+    , getFiletype
 
     -- * Revision
     , Revision

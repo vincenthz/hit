@@ -48,7 +48,7 @@ import qualified Data.Map as M
 
 -- | hierarchy tree, either a reference to a blob (file) or a tree (directory).
 data HTreeEnt = TreeDir Ref HTree | TreeFile Ref
-type HTree = [(Int,ByteString,HTreeEnt)]
+type HTree = [(ModePerm,ByteString,HTreeEnt)]
 
 -- | Exception when trying to convert an object pointed by 'Ref' to
 -- a type that is different

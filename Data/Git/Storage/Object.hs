@@ -161,9 +161,12 @@ objectToBlob (ObjBlob blob) = Just blob
 objectToBlob _              = Nothing
 
 octal :: Parser Int
-octal = B.foldl' step 0 `fmap` takeWhile1 isOct where
-        isOct w = w >= 0x30 && w <= 0x37
+octal = B.foldl' step 0 `fmap` takeWhile1 isOct
+  where isOct w = w >= 0x30 && w <= 0x37
         step a w = a * 8 + fromIntegral (w - 0x30)
+
+modeperm :: Parser ModePerm
+modeperm = ModePerm . fromIntegral <$> octal
 
 tillEOL :: Parser ByteString
 tillEOL = PC.takeWhile ((/= '\n'))
@@ -179,7 +182,7 @@ referenceBin = fromBinary <$> P.take 20
 -- | parse a tree content
 treeParse = Tree <$> parseEnts
     where parseEnts = atEnd >>= \end -> if end then return [] else liftM2 (:) parseEnt parseEnts
-          parseEnt = liftM3 (,,) octal (PC.char ' ' >> takeTill ((==) 0)) (word8 0 >> referenceBin)
+          parseEnt = liftM3 (,,) modeperm (PC.char ' ' >> takeTill ((==) 0)) (word8 0 >> referenceBin)
 
 -- | parse a blob content
 blobParse = (Blob <$> takeLazyByteString)
@@ -250,7 +253,7 @@ objectWrite (ObjTree tree)     = treeWrite tree
 objectWrite _                  = error "delta cannot be marshalled"
 
 treeWrite (Tree ents) = toLazyByteString $ mconcat $ concatMap writeTreeEnt ents
-    where writeTreeEnt (perm,name,ref) =
+    where writeTreeEnt (ModePerm perm,name,ref) =
                 [ string7 (printf "%o" perm)
                 , string7 " "
                 , byteString name

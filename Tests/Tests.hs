@@ -61,6 +61,9 @@ instance Arbitrary GitTime where
                     m <- (* 30) <$> choose (0,1)
                     return (h * 100 + m - 1200)
 
+instance Arbitrary ModePerm where
+    arbitrary = ModePerm <$> elements [ 0o644, 0o664, 0o755, 0 ]
+
 arbitraryName = liftM3 Person (arbitraryBSnoangle 16)
                               (arbitraryBSnoangle 16)
                               arbitrary

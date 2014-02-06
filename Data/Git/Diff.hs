@@ -42,7 +42,7 @@ data BlobContent = FileContent [L.ByteString] -- ^ Text file's lines
 -- | This is a blob description at a given state (revision)
 data BlobState = BlobState
     { bsFilename :: BS.ByteString
-    , bsMode     :: Int
+    , bsMode     :: ModePerm
     , bsRef      :: Ref
     , bsContent  :: BlobContent
     }
@@ -150,7 +150,7 @@ data HitDiffContent = HitDiffAddition  BlobState
                     | HitDiffDeletion  BlobState
                     | HitDiffChange    [AP.Item L.ByteString]
                     | HitDiffBinChange
-                    | HitDiffMode      Int Int
+                    | HitDiffMode      ModePerm ModePerm
                     | HitDiffRefs      Ref Ref
     deriving (Show)
 

@@ -132,8 +132,8 @@ lsTree revision _ git = do
             mapM_ (showTreeEnt) htree
         _      -> error "cannot build a tree from this reference"
     where
-        showTreeEnt (p,n,TreeDir r _) = printf "%06o tree %s    %s\n" p (show r) (BC.unpack n)
-        showTreeEnt (p,n,TreeFile r)  = printf "%06o blob %s    %s\n" p (show r) (BC.unpack n)
+        showTreeEnt (ModePerm p,n,TreeDir r _) = printf "%06o tree %s    %s\n" p (show r) (BC.unpack n)
+        showTreeEnt (ModePerm p,n,TreeFile r)  = printf "%06o blob %s    %s\n" p (show r) (BC.unpack n)
 
 revList revision git = do
     ref <- maybe (error "revision cannot be found") id <$> resolveRevision git revision
@@ -179,7 +179,7 @@ showDiff rev1 rev2 git = do
 
         ppHitMode :: [HitDiffContent] -> IO ()
         ppHitMode []                         = return ()
-        ppHitMode ((HitDiffMode old new):_ ) = printf "old mode %06o\nnew mode %06o\n" old new
+        ppHitMode ((HitDiffMode (ModePerm old) (ModePerm new)):_ ) = printf "old mode %06o\nnew mode %06o\n" old new
         ppHitMode (_                    :xs) = ppHitMode xs
 
         ppHitRefs :: [HitDiffContent] -> IO ()
