@@ -108,8 +108,7 @@ resolveRevision git (Revision prefix modifiers) =
                              "HEAD"       -> [ RefHead ]
                              "ORIG_HEAD"  -> [ RefOrigHead ]
                              "FETCH_HEAD" -> [ RefFetchHead ]
-                             _            -> [ RefTag prefix, RefBranch prefix, RefRemote prefix ]
-
+                             _            -> map (flip ($) (RefName prefix)) [RefTag,RefBranch,RefRemote]
 
         tryResolvers :: [IO (Maybe Ref)] -> IO Ref
         tryResolvers []            = return $ fromHexString prefix

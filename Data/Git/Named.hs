@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 -- |
 -- Module      : Data.Git.Named
 -- License     : BSD-style
@@ -7,20 +5,31 @@
 -- Stability   : experimental
 -- Portability : unix
 --
+-- Manipulation of named references
+-- * reading packed-refs file
+-- * reading single heads/tags/remote file
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Data.Git.Named
     ( RefSpecTy(..)
     , RefContentTy(..)
+    , RefName(..)
     , readPackedRefs
+    -- * manipulating loosed name references
     , existsRefFile
     , writeRefFile
     , readRefFile
+    -- * listings looses name references
+    , headsList
+    , tagsList
+    , remotesList
     ) where
 
 import Control.Applicative ((<$>))
 
 import qualified Filesystem as F
 import qualified Filesystem.Path.Rules as FP (posix, decode, encode, encodeString, decodeString)
-import Filesystem.Path.CurrentOS
+import Filesystem.Path.CurrentOS hiding (root)
 
 import Data.String
 import Data.Git.Path
@@ -34,9 +43,9 @@ import Prelude hiding (FilePath)
 data RefSpecTy = RefHead
                | RefOrigHead
                | RefFetchHead
-               | RefBranch String
-               | RefTag String
-               | RefRemote String
+               | RefBranch RefName
+               | RefTag RefName
+               | RefRemote RefName
                | RefPatches String
                | RefStash
                | RefOther String
@@ -47,6 +56,25 @@ data RefContentTy = RefDirect Ref
                   | RefLink   RefSpecTy
                   | RefContentUnknown B.ByteString
                   deriving (Show,Eq)
+
+newtype RefName = RefName { refNameRaw :: String }
+    deriving (Show,Eq,Ord)
+
+instance IsString RefName where
+    fromString s
+        | isValidRefName s = RefName s
+        | otherwise        = error ("invalid RefName " ++ show s)
+
+isValidRefName :: String -> Bool
+isValidRefName s = not (or $ map isBadChar s)
+  where isBadChar :: Char -> Bool
+        isBadChar c = c <= ' ' || c >= toEnum 0x7f || c `elem` badAscii
+        badAscii = [ '~', '^', ':', '\\', '*', '?', '[' ]
+
+isValidRefFilepath :: FilePath -> Bool
+isValidRefFilepath f
+    | valid f   = isValidRefName $ encodeString f
+    | otherwise = False
 
 -- FIXME BC.unpack/pack should be probably be utf8.toString,
 -- however i don't know if encoding is consistant.
@@ -59,9 +87,9 @@ pathEncode = FP.encode FP.posix
 
 toRefTy :: String -> RefSpecTy
 toRefTy s
-    | "refs/tags/" `isPrefixOf` s    = RefTag $ drop 10 s
-    | "refs/heads/" `isPrefixOf` s   = RefBranch $ drop 11 s
-    | "refs/remotes/" `isPrefixOf` s = RefRemote $ drop 13 s
+    | "refs/tags/" `isPrefixOf` s    = RefTag $ RefName $ drop 10 s
+    | "refs/heads/" `isPrefixOf` s   = RefBranch $ RefName $ drop 11 s
+    | "refs/remotes/" `isPrefixOf` s = RefRemote $ RefName $ drop 13 s
     | "refs/patches/" `isPrefixOf` s = RefPatches $ drop 13 s
     | "refs/stash" == s              = RefStash
     | "HEAD" == s                    = RefHead
@@ -70,9 +98,9 @@ toRefTy s
     | otherwise                      = RefOther $ s
 
 fromRefTy :: RefSpecTy -> String
-fromRefTy (RefBranch h)  = "refs/heads/" ++ h
-fromRefTy (RefTag h)     = "refs/tags/" ++ h
-fromRefTy (RefRemote h)  = "refs/remotes/" ++ h
+fromRefTy (RefBranch h)  = "refs/heads/" ++ refNameRaw h
+fromRefTy (RefTag h)     = "refs/tags/" ++ refNameRaw h
+fromRefTy (RefRemote h)  = "refs/remotes/" ++ refNameRaw h
 fromRefTy (RefPatches h) = "refs/patches/" ++ h
 fromRefTy RefStash       = "refs/stash"
 fromRefTy RefHead        = "HEAD"
@@ -81,9 +109,9 @@ fromRefTy RefFetchHead   = "FETCH_HEAD"
 fromRefTy (RefOther h)   = h
 
 toPath :: FilePath -> RefSpecTy -> FilePath
-toPath gitRepo (RefBranch h)  = gitRepo </> "refs" </> "heads" </> fromString h
-toPath gitRepo (RefTag h)     = gitRepo </> "refs" </> "tags" </> fromString h
-toPath gitRepo (RefRemote h)  = gitRepo </> "refs" </> "remotes" </> fromString h
+toPath gitRepo (RefBranch h)  = gitRepo </> "refs" </> "heads" </> fromString (refNameRaw h)
+toPath gitRepo (RefTag h)     = gitRepo </> "refs" </> "tags" </> fromString (refNameRaw h)
+toPath gitRepo (RefRemote h)  = gitRepo </> "refs" </> "remotes" </> fromString (refNameRaw h)
 toPath gitRepo (RefPatches h) = gitRepo </> "refs" </> "patches" </> fromString h
 toPath gitRepo RefStash       = gitRepo </> "refs" </> "stash"
 toPath gitRepo RefHead        = gitRepo </> "HEAD"
@@ -91,6 +119,7 @@ toPath gitRepo RefOrigHead    = gitRepo </> "ORIG_HEAD"
 toPath gitRepo RefFetchHead   = gitRepo </> "FETCH_HEAD"
 toPath gitRepo (RefOther h)   = gitRepo </> fromString h
 
+readPackedRefs :: FilePath -> IO [(RefSpecTy, Ref)]
 readPackedRefs gitRepo = do
     exists <- F.isFile (packedRefsPath gitRepo)
     if exists then readLines else return []
@@ -101,15 +130,31 @@ readPackedRefs gitRepo = do
                               name     = FP.encodeString FP.posix $ pathDecode $ B.tail r
                            in (toRefTy name, fromHex ref) : a
 
-{-
-headsList gitRepo = getDirectoryContentNoDots (headsPath gitRepo)
-tagsList gitRepo = getDirectoryContentNoDots (tagsPath gitRepo)
-remotesList gitRepo = getDirectoryContentNoDots (remotesPath gitRepo)
-remoteList gitRepo remote = getDirectoryContentNoDots (remotePath gitRepo remote)
+listRefs :: FilePath -> IO [RefName]
+listRefs root = listRefsAcc [] root
+  where listRefsAcc acc dir = do
+            files <- F.listDirectory dir
+            getRefsRecursively dir acc files
+        getRefsRecursively _   acc []     = return acc
+        getRefsRecursively dir acc (x:xs) = do
+            isDir <- F.isDirectory x
+            extra <- if isDir
+                        then listRefsAcc [] dir
+                        else let r = stripRoot x
+                              in if isValidRefFilepath r
+                                    then return [fromString $ encodeString x]
+                                    else return []
+            getRefsRecursively dir (extra ++ acc) xs
+        stripRoot p = maybe (error "stripRoot invalid") id $ stripPrefix root p
 
-writeRef path ref = B.writeFile path (B.concat [toHex ref, B.singleton 0xa])
-readRef path = fromHex . B.take 40 <$> B.readFile path
--}
+headsList :: FilePath -> IO [RefName]
+headsList gitRepo = listRefs (headsPath gitRepo)
+
+tagsList :: FilePath -> IO [RefName]
+tagsList gitRepo = listRefs (tagsPath gitRepo)
+
+remotesList :: FilePath -> IO [RefName]
+remotesList gitRepo = listRefs (remotesPath gitRepo)
 
 existsRefFile :: FilePath -> RefSpecTy -> IO Bool
 existsRefFile gitRepo specty = F.isFile $ toPath gitRepo specty
@@ -128,16 +173,3 @@ readRefFile gitRepo specty = toRefContent <$> F.readFile filepath
             | "ref: " `B.isPrefixOf` content = RefLink $ toRefTy $ FP.encodeString FP.posix $ pathDecode $ head $ BC.lines $ B.drop 5 content
             | B.length content < 42          = RefDirect $ fromHex $ B.take 40 content
             | otherwise                      = RefContentUnknown content
-
-{-
-headExists gitRepo name    = doesFileExist (headPath gitRepo name)
-headRead gitRepo name      = readRef (headPath gitRepo name)
-headWrite gitRepo name ref = writeRef (headPath gitRepo name) ref
-
-tagExists gitRepo name    = doesFileExist (tagPath gitRepo name)
-tagRead gitRepo name      = readRef (tagPath gitRepo name)
-tagWrite gitRepo name ref = writeRef (tagPath gitRepo name) ref
-
-specialRead gitRepo name   = readRefAndFollow gitRepo (specialPath gitRepo name)
-specialExists gitRepo name = doesFileExist (specialPath gitRepo name)
--}
