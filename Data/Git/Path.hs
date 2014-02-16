@@ -14,9 +14,9 @@ import Control.Applicative ((<$>))
 import Data.Git.Ref
 import Data.String
 
-headsPath gitRepo = gitRepo </> "refs" </> "heads"
-tagsPath gitRepo  = gitRepo </> "refs" </> "tags"
-remotesPath gitRepo = gitRepo </> "refs" </> "remotes"
+headsPath gitRepo = gitRepo </> "refs" </> "heads" </> ""
+tagsPath gitRepo  = gitRepo </> "refs" </> "tags" </> ""
+remotesPath gitRepo = gitRepo </> "refs" </> "remotes" </> ""
 packedRefsPath gitRepo = gitRepo </> "packed-refs"
 
 headPath gitRepo name = headsPath gitRepo </> fromString name
