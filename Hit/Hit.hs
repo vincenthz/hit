@@ -19,6 +19,7 @@ import Data.Git.Storage
 import Data.Git.Types
 import Data.Git.Ref
 import Data.Git.Repository
+import Data.Git.Named
 import Data.Git.Revision
 import Data.Git.Diff
 import Data.Word
@@ -213,6 +214,15 @@ showDiff rev1 rev2 git = do
         doPPDiffLine _      []     = []
         doPPDiffLine prefix (a:xs) = (LC.concat [LC.pack prefix,a,LC.pack "\n"]):(doPPDiffLine prefix xs)
 
+
+showRefs git = do
+    putStrLn "[HEADS]"
+    heads <- headsList (gitRepoPath git)
+    mapM_ (putStrLn . show) heads
+    putStrLn "[TAGS]"
+    tags <- tagsList (gitRepoPath git)
+    mapM_ (putStrLn . show) tags
+
 main = do
     args <- getArgs
     case args of
@@ -223,6 +233,7 @@ main = do
         ["rev-list",rev]     -> withCurrentRepo $ revList (fromString rev)
         ["log",rev]          -> withCurrentRepo $ getLog (fromString rev)
         ["diff",rev1,rev2]   -> withCurrentRepo $ showDiff (fromString rev1) (fromString rev2)
+        ["show-refs"]        -> withCurrentRepo $ showRefs
         cmd : [] -> error ("unknown command: " ++ cmd)
         []       -> error "no args"
         _        -> error "unknown command line arguments"
