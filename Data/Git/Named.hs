@@ -142,7 +142,7 @@ listRefs root = listRefsAcc [] root
                         then listRefsAcc [] dir
                         else let r = stripRoot x
                               in if isValidRefFilepath r
-                                    then return [fromString $ encodeString x]
+                                    then return [fromString $ encodeString r]
                                     else return []
             getRefsRecursively dir (extra ++ acc) xs
         stripRoot p = maybe (error "stripRoot invalid") id $ stripPrefix root p
