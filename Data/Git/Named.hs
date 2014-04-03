@@ -15,6 +15,7 @@ module Data.Git.Named
     , RefContentTy(..)
     , RefName(..)
     , readPackedRefs
+    , PackedRefs(..)
     -- * manipulating loosed name references
     , existsRefFile
     , writeRefFile
@@ -119,17 +120,35 @@ toPath gitRepo RefOrigHead    = gitRepo </> "ORIG_HEAD"
 toPath gitRepo RefFetchHead   = gitRepo </> "FETCH_HEAD"
 toPath gitRepo (RefOther h)   = gitRepo </> fromString h
 
-readPackedRefs :: FilePath -> IO [(RefSpecTy, Ref)]
-readPackedRefs gitRepo = do
-    exists <- F.isFile (packedRefsPath gitRepo)
-    if exists then readLines else return []
-    where readLines = foldl accu [] . BC.lines <$> F.readFile (packedRefsPath gitRepo)
-          accu a l
-            | "#" `BC.isPrefixOf` l = a
-            | otherwise = let (ref, r) = B.splitAt 40 l
-                              name     = FP.encodeString FP.posix $ pathDecode $ B.tail r
-                           in (toRefTy name, fromHex ref) : a
+data PackedRefs a = PackedRefs
+    { packedRemotes :: a
+    , packedBranchs :: a
+    , packedTags    :: a
+    }
 
+readPackedRefs :: FilePath
+               -> ([(RefName, Ref)] -> a)
+               -> IO (PackedRefs a)
+readPackedRefs gitRepo constr = do
+    exists <- F.isFile (packedRefsPath gitRepo)
+    if exists then readLines else return $ finalize emptyPackedRefs
+  where emptyPackedRefs = PackedRefs [] [] []
+        readLines = finalize . foldl accu emptyPackedRefs . BC.lines <$> F.readFile (packedRefsPath gitRepo)
+        finalize (PackedRefs a b c) = PackedRefs (constr a) (constr b) (constr c)
+        accu a l
+            | "#" `BC.isPrefixOf` l = a
+            | otherwise =
+                let (ref, r) = B.splitAt 40 l
+                    name     = FP.encodeString FP.posix $ pathDecode $ B.tail r
+                 in case toRefTy name of
+                        -- accumulate tag, branch and remotes
+                        RefTag refname    -> a { packedTags    = (refname, fromHex ref) : packedTags a }
+                        RefBranch refname -> a { packedBranchs = (refname, fromHex ref) : packedBranchs a }
+                        RefRemote refname -> a { packedRemotes = (refname, fromHex ref) : packedRemotes a }
+                        -- anything else that shouldn't be there get dropped on the floor
+                        _                 -> a
+
+-- | list all the loose refs available recursively from a directory starting point
 listRefs :: FilePath -> IO [RefName]
 listRefs root = listRefsAcc [] root
   where listRefsAcc acc dir = do

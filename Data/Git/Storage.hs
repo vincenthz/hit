@@ -69,7 +69,7 @@ import Prelude hiding (FilePath)
 data PackIndexReader = PackIndexReader PackIndexHeader FileReader
 
 -- | this is a cache representation of the packed-ref file
-type PackedRef = CacheFile (M.Map RefSpecTy Ref)
+type CachedPackedRef = CacheFile (PackedRefs (M.Map RefName Ref))
 
 -- | represent a git repo, with possibly already opened filereaders
 -- for indexes and packs
@@ -77,13 +77,15 @@ data Git = Git
     { gitRepoPath  :: FilePath
     , indexReaders :: IORef [(Ref, PackIndexReader)]
     , packReaders  :: IORef [(Ref, FileReader)]
-    , packedNamed  :: PackedRef
+    , packedNamed  :: CachedPackedRef
     }
 
 -- | open a new git repository context
 openRepo :: FilePath -> IO Git
 openRepo path = liftM3 (Git path) (newIORef []) (newIORef []) packedRef
-    where packedRef = newCacheVal (packedRefsPath path) (M.fromList <$> readPackedRefs path) M.empty
+    where packedRef = newCacheVal (packedRefsPath path)
+                                  (readPackedRefs path M.fromList)
+                                  (PackedRefs M.empty M.empty M.empty)
 
 -- | close a git repository context, closing all remaining fileReaders.
 closeRepo :: Git -> IO ()

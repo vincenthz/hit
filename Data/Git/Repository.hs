@@ -100,9 +100,12 @@ resolveRevision git (Revision prefix modifiers) =
                                      RefDirect ref     -> return $ Just ref
                                      RefLink refspecty -> followToRef onFailure refspecty
                                      _                 -> error "cannot handle reference content"
-                        else case M.lookup refty lookupCache of
-                                  Nothing -> onFailure
-                                  y       -> return y
+                        else case refty of
+                                RefTag name    -> mapLookup name $ packedTags lookupCache
+                                RefBranch name -> mapLookup name $ packedBranchs lookupCache
+                                RefRemote name -> mapLookup name $ packedRemotes lookupCache
+                                _              -> return Nothing
+                  where mapLookup name m = maybe onFailure (return . Just) $ M.lookup name m
 
         namedResolvers = case prefix of
                              "HEAD"       -> [ RefHead ]
