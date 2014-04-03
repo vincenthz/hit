@@ -12,6 +12,7 @@ module Data.Git.Repository
     ( Git
     , HTree
     , HTreeEnt(..)
+    , RefName(..)
     , getCommitMaybe
     , getCommit
     , getTreeMaybe
@@ -23,6 +24,13 @@ module Data.Git.Repository
     , resolveRevision
     , initRepo
     , isRepo
+    -- * named refs manipulation
+    , branchWrite
+    , branchList
+    , tagWrite
+    , tagList
+    , headSet
+    , headGet
     ) where
 
 import Control.Applicative ((<$>))
@@ -44,7 +52,10 @@ import Data.Git.Storage.Loose
 import Data.Git.Storage.CacheFile
 import Data.Git.Ref
 
+import Data.Set (Set)
+
 import qualified Data.Map as M
+import qualified Data.Set as Set
 
 -- | hierarchy tree, either a reference to a blob (file) or a tree (directory).
 data HTreeEnt = TreeDir Ref HTree | TreeFile Ref
@@ -223,3 +234,53 @@ resolvePath git commitRef paths =
 
         findEnt x = find (\(_, b, _) -> b == x)
         treeEntRef (_,_,r) = r
+
+-- | Write a branch to point to a specific reference
+branchWrite :: Git     -- ^ repository
+            -> RefName -- ^ the name of the branch to write
+            -> Ref     -- ^ the reference to set
+            -> IO ()
+branchWrite git branchName ref =
+    writeRefFile (gitRepoPath git) (RefBranch branchName) (RefDirect ref)
+
+-- | Return the list of branches
+branchList :: Git -> IO (Set RefName)
+branchList git = do
+    ps <- Set.fromList . M.keys . packedBranchs <$> getCacheVal (packedNamed git)
+    ls <- Set.fromList <$> looseHeadsList (gitRepoPath git)
+    return $ Set.union ps ls
+
+-- | Write a tag to point to a specific reference
+tagWrite :: Git     -- ^ repository
+         -> RefName -- ^ the name of the tag to write
+         -> Ref     -- ^ the reference to set
+         -> IO ()
+tagWrite git tagname ref =
+    writeRefFile (gitRepoPath git) (RefTag tagname) (RefDirect ref)
+
+-- | Return the list of branches
+tagList :: Git -> IO (Set RefName)
+tagList git = do
+    ps <- Set.fromList . M.keys . packedTags <$> getCacheVal (packedNamed git)
+    ls <- Set.fromList <$> looseTagsList (gitRepoPath git)
+    return $ Set.union ps ls
+
+-- | Set head to point to either a reference or a branch name.
+headSet :: Git                -- ^ repository
+        -> Either Ref RefName -- ^ either a raw reference or a branch name
+        -> IO ()
+headSet git (Left ref)      =
+    writeRefFile (gitRepoPath git) RefHead (RefDirect ref)
+headSet git (Right refname) =
+    writeRefFile (gitRepoPath git) RefHead (RefLink $ RefBranch refname)
+
+-- | Get what the head is pointing to, or the reference otherwise
+headGet :: Git
+        -> IO (Either Ref RefName)
+headGet git = do
+    content <- readRefFile (gitRepoPath git) RefHead
+    case content of
+        RefLink (RefBranch b) -> return $ Right b
+        RefLink spec          -> error ("unknown content link in HEAD: " ++ show spec)
+        RefDirect r           -> return $ Left r
+        RefContentUnknown bs  -> error ("unknown content in HEAD: " ++ show bs)

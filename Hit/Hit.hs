@@ -19,10 +19,10 @@ import Data.Git.Storage
 import Data.Git.Types
 import Data.Git.Ref
 import Data.Git.Repository
-import Data.Git.Named
 import Data.Git.Revision
 import Data.Git.Diff
 import Data.Word
+import qualified Data.Set as S
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString.Char8 as BC
 import Text.Printf
@@ -47,7 +47,7 @@ verifyPack pref git = do
     -- or a list of delta to resolves
     packEnumerateObjects (gitRepoPath git) pref entries (setObj leftParsed refs offsets tree)
     readIORefAndReplace refs M.empty >>= dumpTree offsets tree
-    where
+  where
         readIORefAndReplace ioref emptyVal = do
             v <- readIORef ioref
             writeIORef ioref emptyVal
@@ -215,12 +215,12 @@ showDiff rev1 rev2 git = do
 
 
 showRefs git = do
-    putStrLn "[HEADS]"
-    heads <- headsList (gitRepoPath git)
-    mapM_ (putStrLn . show) heads
+    putStrLn "[BRANCHES]"
+    heads <- branchList git
+    mapM_ (putStrLn . refNameRaw) $ S.toList heads
     putStrLn "[TAGS]"
-    tags <- tagsList (gitRepoPath git)
-    mapM_ (putStrLn . show) tags
+    tags <- tagList git
+    mapM_ (putStrLn . refNameRaw) $ S.toList tags
 
 main = do
     args <- getArgs
@@ -232,6 +232,7 @@ main = do
         ["rev-list",rev]     -> withCurrentRepo $ revList (fromString rev)
         ["log",rev]          -> withCurrentRepo $ getLog (fromString rev)
         ["diff",rev1,rev2]   -> withCurrentRepo $ showDiff (fromString rev1) (fromString rev2)
+        ["tag"]              -> withCurrentRepo $ showRefs
         ["show-refs"]        -> withCurrentRepo $ showRefs
         cmd : [] -> error ("unknown command: " ++ cmd)
         []       -> error "no args"

@@ -9,6 +9,7 @@ module Data.Git
     (
     -- * Basic types
       Ref
+    , RefName(..)
     , Commit(..)
     , Person(..)
     , CommitExtra(..)
@@ -51,6 +52,15 @@ module Data.Git
 
     -- * Set objects
     , setObject
+    , toObject
+
+    -- * Named refs
+    , branchWrite
+    , branchList
+    , tagWrite
+    , tagList
+    , headSet
+    , headGet
     ) where
 
 import Data.Git.Ref
@@ -58,3 +68,4 @@ import Data.Git.Types
 import Data.Git.Storage
 import Data.Git.Repository
 import Data.Git.Revision
+import Data.Git.Storage.Object (toObject)
