@@ -12,6 +12,7 @@ module Data.Git.Storage
     ( Git
     , packedNamed
     , gitRepoPath
+    -- * opening repositories
     , openRepo
     , closeRepo
     , withRepo
@@ -19,9 +20,12 @@ module Data.Git.Storage
     , findRepoMaybe
     , findRepo
     , isRepo
+    -- * creating repositories
     , initRepo
+    -- * repository accessors
     , getDescription
     , setDescription
+    -- * iterators
     , iterateIndexes
     , findReference
     , findReferencesWithPrefix
