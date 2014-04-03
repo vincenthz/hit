@@ -20,9 +20,9 @@ module Data.Git.Named
     , writeRefFile
     , readRefFile
     -- * listings looses name references
-    , headsList
-    , tagsList
-    , remotesList
+    , looseHeadsList
+    , looseTagsList
+    , looseRemotesList
     ) where
 
 import Control.Applicative ((<$>))
@@ -147,14 +147,14 @@ listRefs root = listRefsAcc [] root
             getRefsRecursively dir (extra ++ acc) xs
         stripRoot p = maybe (error "stripRoot invalid") id $ stripPrefix root p
 
-headsList :: FilePath -> IO [RefName]
-headsList gitRepo = listRefs (headsPath gitRepo)
+looseHeadsList :: FilePath -> IO [RefName]
+looseHeadsList gitRepo = listRefs (headsPath gitRepo)
 
-tagsList :: FilePath -> IO [RefName]
-tagsList gitRepo = listRefs (tagsPath gitRepo)
+looseTagsList :: FilePath -> IO [RefName]
+looseTagsList gitRepo = listRefs (tagsPath gitRepo)
 
-remotesList :: FilePath -> IO [RefName]
-remotesList gitRepo = listRefs (remotesPath gitRepo)
+looseRemotesList :: FilePath -> IO [RefName]
+looseRemotesList gitRepo = listRefs (remotesPath gitRepo)
 
 existsRefFile :: FilePath -> RefSpecTy -> IO Bool
 existsRefFile gitRepo specty = F.isFile $ toPath gitRepo specty
