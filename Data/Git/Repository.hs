@@ -10,6 +10,11 @@
 --
 module Data.Git.Repository
     ( Git
+    -- * Config
+    , configRead
+    , Cfg.Config(..)
+    , Cfg.Section(..)
+    -- * Trees
     , HTree
     , HTreeEnt(..)
     , RefName(..)
@@ -51,6 +56,7 @@ import Data.Git.Revision
 import Data.Git.Storage.Loose
 import Data.Git.Storage.CacheFile
 import Data.Git.Ref
+import qualified Data.Git.Config as Cfg
 
 import Data.Set (Set)
 
@@ -284,3 +290,7 @@ headGet git = do
         RefLink spec          -> error ("unknown content link in HEAD: " ++ show spec)
         RefDirect r           -> return $ Left r
         RefContentUnknown bs  -> error ("unknown content in HEAD: " ++ show bs)
+
+-- | Read the Config
+configRead :: Git -> IO Cfg.Config
+configRead git = Cfg.readConfig (gitRepoPath git)

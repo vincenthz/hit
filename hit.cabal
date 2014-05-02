@@ -62,6 +62,7 @@ Library
                      Data.Git.Repository
                      Data.Git.Diff
   Other-modules:     Data.Git.Internal
+                     Data.Git.Config
                      Data.Git.Storage.FileReader
                      Data.Git.Storage.FileWriter
                      Data.Git.Storage.CacheFile

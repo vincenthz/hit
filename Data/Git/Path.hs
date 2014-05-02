@@ -14,6 +14,8 @@ import Control.Applicative ((<$>))
 import Data.Git.Ref
 import Data.String
 
+configPath gitRepo = gitRepo </> "config"
+
 headsPath gitRepo = gitRepo </> "refs" </> "heads" </> ""
 tagsPath gitRepo  = gitRepo </> "refs" </> "tags" </> ""
 remotesPath gitRepo = gitRepo </> "refs" </> "remotes" </> ""
