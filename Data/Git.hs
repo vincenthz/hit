@@ -16,7 +16,7 @@ module Data.Git
     , Tree(..)
     , Blob(..)
     , Tag(..)
-    , GitTime(..)
+    , GitTime
     , ModePerm(..)
 
     -- * Helper & type related to ModePerm

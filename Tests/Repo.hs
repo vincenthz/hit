@@ -15,9 +15,6 @@ import Data.Git.Ref
 import Data.Git.Types
 import Data.Git.Repository
 
-import Data.Time.LocalTime
-import Data.Time.Clock
-import Data.Time.Calendar
 import Data.Maybe
 
 import Text.Bytedump

@@ -12,9 +12,7 @@ import Data.Git.Storage.Object
 import Data.Git.Storage.Loose
 import Data.Git.Ref
 import Data.Git.Types
-import Data.Time.LocalTime
-import Data.Time.Clock
-import Data.Time.Calendar
+import Data.Hourglass
 
 import Data.Maybe
 
@@ -45,22 +43,12 @@ arbitraryRefList = replicateM 2 arbitrary
 arbitraryEnt = liftM3 (,,) arbitrary (arbitraryBSno0 48) arbitrary
 arbitraryEnts = choose (1,2) >>= \i -> replicateM i arbitraryEnt
 
-instance Arbitrary TimeZone where
-    arbitrary = hoursToTimeZone . rel <$> arbitrary
-        where rel a = (a `mod` 24) - 12
-
-instance Arbitrary UTCTime where
-    arbitrary = UTCTime <$> (flip addDays b <$> choose (0, 365 * 40))
-                        <*> (secondsToDiffTime <$> arbitrary)
-        where b = fromGregorian 1970 1 1
-
-instance Arbitrary GitTime where
-    arbitrary = GitTime <$> (arbitrary `suchThat` \i -> i > 0) <*> arbitraryTz
-        where arbitraryTz = do
-                    h <- choose (0, 23)
-                    m <- (* 30) <$> choose (0,1)
-                    return (h * 100 + m - 1200)
-
+instance Arbitrary TimezoneOffset where
+    arbitrary = TimezoneOffset <$> choose (-11*60, 12*60)
+instance Arbitrary Elapsed where
+    arbitrary = Elapsed . Seconds <$> choose (0,2^32-1)
+instance Arbitrary t => Arbitrary (LocalTime t) where
+    arbitrary = LocalTime <$> arbitrary <*> arbitrary
 instance Arbitrary ModePerm where
     arbitrary = ModePerm <$> elements [ 0o644, 0o664, 0o755, 0 ]
 

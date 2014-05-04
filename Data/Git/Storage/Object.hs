@@ -57,6 +57,7 @@ import Control.Monad
 import Data.List (intersperse)
 import Data.Monoid
 import Data.Word
+import Data.Hourglass
 import Text.Printf
 
 #if MIN_VERSION_bytestring(0,10,0)
@@ -232,9 +233,12 @@ parsePerson = do
         _ <- string "> "
         time <- PC.decimal :: Parser Integer
         _ <- string " "
-        timezone <- PC.signed PC.decimal
+        timezoneFmt  <- PC.signed PC.decimal
+        let timezoneSign = if timezoneFmt < 0 then negate else id
+        let (h,m)    = abs timezoneFmt `divMod` 100
+            timezone = timezoneSign (h * 60 + m)
         skipChar '\n'
-        return $ Person name email (GitTime time timezone)
+        return $ Person name email (gitTime time timezone)
 
 objectParseTree   = ObjTree <$> treeParse
 objectParseCommit = ObjCommit <$> commitParse
@@ -337,7 +341,6 @@ objectHash :: ObjectType -> Word64 -> L.ByteString -> Ref
 objectHash ty w lbs = hashLBS $ L.fromChunks (objectWriteHeader ty w : L.toChunks lbs)
 
 -- used for objectWrite for commit and tag
-writeName label (Person name email (GitTime time tz)) =
-        B.concat [label, " ", name, " <", email, "> ", BC.pack (printf "%d %s%02d%02d" time tzs tzh tzm) ]
-        where tzs = if tz >= 0 then "+" else "-" :: String
-              (tzh,tzm) = abs (tz) `divMod` 100
+writeName label (Person name email locTime) =
+        B.concat [label, " ", name, " <", email, "> ", BC.pack timeStr]
+  where timeStr = timePrint ("EPOCH TZHM" :: String) locTime

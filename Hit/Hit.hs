@@ -21,6 +21,7 @@ import Data.Git.Ref
 import Data.Git.Repository
 import Data.Git.Revision
 import Data.Git.Diff
+import Data.Hourglass
 import Data.Word
 import qualified Data.Set as S
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -157,7 +158,7 @@ getLog revision git = do
             mapM_ putStrLn
                 [ ("commit: " ++ show ref)
                 , ("author: " ++ BC.unpack (personName author) ++ " <" ++ BC.unpack (personEmail author) ++ ">")
-                , ("date:   " ++ show (toZonedTime $ personTime author) ++ " (" ++ show (toUTCTime $ personTime author) ++ ")")
+                , ("date:   " ++ timePrint ISO8601_DateAndTime (personTime author) ++ " (" ++ timePrint ISO8601_DateAndTime (personTime author) ++ ")")
                 , ""
                 , BC.unpack $ commitMessage commit
                 ]
