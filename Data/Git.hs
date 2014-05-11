@@ -34,6 +34,7 @@ module Data.Git
     , resolvePath
 
     -- * repo context
+    , Git
     , withCurrentRepo
     , withRepo
     , findRepo
