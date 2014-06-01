@@ -183,7 +183,7 @@ data HitFileRef = NewRef        Ref
 -- | This is a proposed diff records for a given file.
 -- It contains useful information:
 --   * the filename (with its path in the root project)
---   * a file diff (with the Data.Algorythm.Patience method)
+--   * a file diff (with the Data.Algorithm.Patience method)
 --   * the file's mode (i.e. the file priviledge)
 --   * the file's ref
 data HitDiff = HitDiff
