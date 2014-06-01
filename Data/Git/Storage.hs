@@ -149,7 +149,7 @@ isRepo :: FilePath -> IO Bool
 isRepo path = do
     dir     <- isDirectory path
     subDirs <- mapM (isDirectory . (path </>))
-                    [ "branches", "hooks", "info"
+                    [ "hooks", "info"
                     , "logs", "objects", "refs"
                     , "refs"</> "heads", "refs"</> "tags"]
     return $ and ([dir] ++ subDirs)
