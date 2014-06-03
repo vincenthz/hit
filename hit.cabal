@@ -75,7 +75,7 @@ Executable           Hit
   hs-source-dirs:    Hit
   ghc-options:       -Wall -fno-warn-orphans -fno-warn-missing-signatures
   if flag(debug)
-    ghc-options:     -rtsops -auto-all -caf-all
+    ghc-options:     -rtsopts -auto-all -caf-all
   if flag(executable)
     Build-depends:   base >= 4 && < 5
                    , mtl
