@@ -47,8 +47,8 @@ instance Arbitrary TimezoneOffset where
     arbitrary = TimezoneOffset <$> choose (-11*60, 12*60)
 instance Arbitrary Elapsed where
     arbitrary = Elapsed . Seconds <$> choose (0,2^32-1)
-instance Arbitrary t => Arbitrary (LocalTime t) where
-    arbitrary = LocalTime <$> arbitrary <*> arbitrary
+instance Arbitrary GitTime where
+    arbitrary = GitTime <$> arbitrary <*> arbitrary
 instance Arbitrary ModePerm where
     arbitrary = ModePerm <$> elements [ 0o644, 0o664, 0o755, 0 ]
 

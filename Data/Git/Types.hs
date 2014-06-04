@@ -24,8 +24,9 @@ module Data.Git.Types
     , getPermission
     , getFiletype
     -- * time type
-    , GitTime
+    , GitTime(..)
     , gitTime
+    , gitTimeToLocal
     -- * Pack delta types
     , DeltaOfs(..)
     , DeltaRef(..)
@@ -41,9 +42,11 @@ import qualified Data.ByteString.Lazy as L
 
 import Data.Git.Ref
 import Data.Git.Delta
-import Data.Hourglass (Elapsed, LocalTime(..), TimezoneOffset(..))
+import Data.Hourglass (Elapsed, TimezoneOffset(..)
+                      , timePrint, timeConvert
+                      , Time(..), Timeable(..)
+                      , LocalTime, localTimeSetTimezone, localTimeFromGlobal)
 import Data.Data
-
 
 -- | type of a git object.
 data ObjectType =
@@ -55,12 +58,32 @@ data ObjectType =
     | TypeDeltaRef
     deriving (Show,Eq,Data,Typeable)
 
--- | Git time is number of seconds since unix epoch with a timezone
-type GitTime = LocalTime Elapsed
+-- | Git time is number of seconds since unix epoch in the UTC zone with
+-- the current timezone associated
+data GitTime = GitTime
+    { gitTimeUTC      :: Elapsed
+    , gitTimeTimezone :: TimezoneOffset
+    } deriving (Eq)
+
+instance Timeable GitTime where
+    timeGetNanoSeconds _ = 0
+    timeGetElapsedP (GitTime t _) = timeConvert t
+    timeGetElapsed  (GitTime t _) = t
+instance Time GitTime where
+    timeFromElapsedP e = GitTime (timeGetElapsed e) (TimezoneOffset 0)
+    timeFromElapsed e = GitTime e (TimezoneOffset 0)
+
+instance Show GitTime where
+    show (GitTime t tz) =
+        timePrint "EPOCH" t ++ " " ++ show tz
 
 gitTime :: Integer -> Int -> GitTime
 gitTime seconds tzMins =
-    LocalTime (fromIntegral seconds) (TimezoneOffset tzMins)
+    GitTime (fromIntegral seconds) (TimezoneOffset tzMins)
+
+gitTimeToLocal :: GitTime -> LocalTime Elapsed
+gitTimeToLocal (GitTime t tz) =
+    localTimeSetTimezone tz (localTimeFromGlobal t)
 
 -- | the enum instance is useful when marshalling to pack file.
 instance Enum ObjectType where

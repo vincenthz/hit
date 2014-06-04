@@ -46,7 +46,7 @@ Library
                    , random
                    , zlib
                    , zlib-bindings >= 0.1 && < 0.2
-                   , hourglass
+                   , hourglass >= 0.2
                    , unix
                    , patience
   Exposed-modules:   Data.Git

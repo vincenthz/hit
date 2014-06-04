@@ -57,7 +57,6 @@ import Control.Monad
 import Data.List (intersperse)
 import Data.Monoid
 import Data.Word
-import Data.Hourglass
 import Text.Printf
 
 #if MIN_VERSION_bytestring(0,10,0)
@@ -343,4 +342,4 @@ objectHash ty w lbs = hashLBS $ L.fromChunks (objectWriteHeader ty w : L.toChunk
 -- used for objectWrite for commit and tag
 writeName label (Person name email locTime) =
         B.concat [label, " ", name, " <", email, "> ", BC.pack timeStr]
-  where timeStr = timePrint ("EPOCH TZHM" :: String) locTime
+  where timeStr = show locTime
