@@ -116,6 +116,11 @@ getNextObject fr mapData =
 packedObjectToObject (PackedObjectInfo { poiType = ty, poiExtra = extra }, objData) =
         packObjectFromRaw (ty, extra, objData)
 
+-- | Transform a tuple of (type of object, optional delta pointer, and data)
+-- to a parsed object.
+--
+-- if parsing fail, return Nothing
+packObjectFromRaw :: (ObjectType, Maybe ObjectPtr, L.ByteString) -> Maybe Object
 packObjectFromRaw (TypeCommit, Nothing, objData) = AL.maybeResult $ AL.parse objectParseCommit objData
 packObjectFromRaw (TypeTree, Nothing, objData)   = AL.maybeResult $ AL.parse objectParseTree objData
 packObjectFromRaw (TypeBlob, Nothing, objData)   = AL.maybeResult $ AL.parse objectParseBlob objData

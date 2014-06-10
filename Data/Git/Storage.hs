@@ -10,8 +10,11 @@
 
 module Data.Git.Storage
     ( Git
+    , GitFile
     , packedNamed
     , gitRepoPath
+    , gitFileBackend
+    , gitFilePath
     -- * opening repositories
     , openRepo
     , closeRepo
@@ -45,7 +48,7 @@ import Filesystem.Path hiding (concat)
 import Filesystem.Path.Rules
 import System.Environment
 
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>), pure)
 import Control.Exception
 import qualified Control.Exception as E
 import Control.Monad
@@ -78,7 +81,14 @@ type CachedPackedRef = CacheFile (PackedRefs (M.Map RefName Ref))
 -- | represent a git repo, with possibly already opened filereaders
 -- for indexes and packs
 data Git = Git
-    { gitRepoPath  :: FilePath
+    { gitRepoPath    :: FilePath
+    , gitFileBackend :: GitFile
+    , objectReader   :: Ref -> Bool -> IO (Maybe Object)
+    , objectWriter   :: Object -> IO Ref
+    }
+
+data GitFile = GitFile
+    { gitFilePath  :: FilePath
     , indexReaders :: IORef [(Ref, PackIndexReader)]
     , packReaders  :: IORef [(Ref, FileReader)]
     , packedNamed  :: CachedPackedRef
@@ -86,17 +96,24 @@ data Git = Git
 
 -- | open a new git repository context
 openRepo :: FilePath -> IO Git
-openRepo path = liftM3 (Git path) (newIORef []) (newIORef []) packedRef
-    where packedRef = newCacheVal (packedRefsPath path)
-                                  (readPackedRefs path M.fromList)
-                                  (PackedRefs M.empty M.empty M.empty)
+openRepo path = do
+    gfb <- GitFile path <$> newIORef [] <*> newIORef [] <*> packedRef
+    let reader ref resolveDelta =
+            let toObj (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
+             in maybe Nothing toObj <$> getObjectRaw gfb ref resolveDelta
+    return $ Git path gfb reader writer
+  where packedRef = newCacheVal (packedRefsPath path)
+                                (readPackedRefs path M.fromList)
+                                (PackedRefs M.empty M.empty M.empty)
+        writer = looseWrite path
 
 -- | close a git repository context, closing all remaining fileReaders.
 closeRepo :: Git -> IO ()
-closeRepo (Git { indexReaders = ireaders, packReaders = preaders }) = do
+closeRepo git = do
     mapM_ (closeIndexReader . snd) =<< readIORef ireaders
     mapM_ (fileReaderClose . snd) =<< readIORef preaders
   where closeIndexReader (PackIndexReader _ fr) = fileReaderClose fr
+        (GitFile { indexReaders = ireaders, packReaders = preaders }) = gitFileBackend git
 
 -- | Find the git repository from the current directory.
 --
@@ -182,8 +199,9 @@ setDescription git desc = do
     Prelude.writeFile (encodeString posix descriptionPath) desc
   where descriptionPath = (gitRepoPath git) </> "description"
 
+--iterateIndexes :: GitFile -> Int -> Int -> IO ()
 iterateIndexes git f initAcc = do
-    allIndexes    <- packIndexEnumerate (gitRepoPath git)
+    allIndexes    <- packIndexEnumerate (gitFilePath git)
     readers       <- readIORef (indexReaders git)
     (a,terminate) <- loop initAcc readers
     if terminate
@@ -198,7 +216,7 @@ iterateIndexes git f initAcc = do
 
         readRemainingIndexes acc []            = return acc
         readRemainingIndexes acc (idxref:idxs) = do
-            fr <- packIndexOpen (gitRepoPath git) idxref
+            fr <- packIndexOpen (gitFilePath git) idxref
             idx <- packIndexReadHeader fr
             let idxreader = PackIndexReader idx fr
             let r = (idxref, idxreader)
@@ -209,11 +227,11 @@ iterateIndexes git f initAcc = do
                 else readRemainingIndexes nacc idxs
 
 -- | Get the object location of a specific reference
-findReference :: Git -> Ref -> IO ObjectLocation
+findReference :: GitFile -> Ref -> IO ObjectLocation
 findReference git ref = maybe NotFound id <$> (findLoose `mplusIO` findInIndexes)
   where findLoose :: IO (Maybe ObjectLocation)
         findLoose = do
-            isLoose <- looseExists (gitRepoPath git) ref
+            isLoose <- looseExists (gitFilePath git) ref
             if isLoose then return (Just $ Loose ref) else return Nothing
 
         findInIndexes :: IO (Maybe ObjectLocation)
@@ -231,12 +249,12 @@ findReference git ref = maybe NotFound id <$> (findLoose `mplusIO` findInIndexes
             Just v  -> return $ Just v
 
 -- | get all the references that start by a specific prefix
-findReferencesWithPrefix :: Git -> String -> IO [Ref]
+findReferencesWithPrefix :: GitFile -> String -> IO [Ref]
 findReferencesWithPrefix git pre
     | invalidLength         = error ("not a valid prefix: " ++ show pre)
     | not (isHexString pre) = error ("reference prefix contains non hexchar: " ++ show pre)
     | otherwise             = do
-        looseRefs  <- looseEnumerateWithPrefixFilter (gitRepoPath git) (take 2 pre) matchRef
+        looseRefs  <- looseEnumerateWithPrefixFilter (gitFilePath git) (take 2 pre) matchRef
         packedRefs <- concat <$> iterateIndexes git idxPrefixMatch []
         return (looseRefs ++ packedRefs)
   where -- not very efficient way to do that... will do for now.
@@ -247,17 +265,17 @@ findReferencesWithPrefix git pre
             refs <- packIndexGetReferencesWithPrefix idxhdr indexreader pre
             return (refs:acc,False)
 
-readRawFromPack :: Git -> Ref -> Word64 -> IO (FileReader, PackedObjectRaw)
+readRawFromPack :: GitFile -> Ref -> Word64 -> IO (FileReader, PackedObjectRaw)
 readRawFromPack git pref offset = do
     readers <- readIORef (packReaders git)
     reader  <- maybe getDefault return $ lookup pref readers
     po <- packReadRawAtOffset reader offset
     return (reader, po)
-  where getDefault = do p <- packOpen (gitRepoPath git) pref
+  where getDefault = do p <- packOpen (gitFilePath git) pref
                         modifyIORef (packReaders git) ((pref, p):)
                         return p
 
-readFromPack :: Git -> Ref -> Word64 -> Bool -> IO (Maybe ObjectInfo)
+readFromPack :: GitFile -> Ref -> Word64 -> Bool -> IO (Maybe ObjectInfo)
 readFromPack git pref o resolveDelta = do
     (reader, x) <- readRawFromPack git pref o
     if resolveDelta then resolve reader o x else return $ Just $ generifyHeader x
@@ -291,27 +309,27 @@ readFromPack git pref o resolveDelta = do
         applyDelta _ _                                      = Nothing
 
 -- | get an object from repository
-getObjectRawAt :: Git -> ObjectLocation -> Bool -> IO (Maybe ObjectInfo)
+getObjectRawAt :: GitFile -> ObjectLocation -> Bool -> IO (Maybe ObjectInfo)
 getObjectRawAt _   NotFound    _ = return Nothing
-getObjectRawAt git (Loose ref) _ = Just . (\(h,d)-> ObjectInfo h d[]) <$> looseReadRaw (gitRepoPath git) ref
+getObjectRawAt git (Loose ref) _ = Just . (\(h,d)-> ObjectInfo h d[]) <$> looseReadRaw (gitFilePath git) ref
 getObjectRawAt git (Packed pref o) resolveDelta = readFromPack git pref o resolveDelta
 
 -- | get an object from repository
-getObjectRaw :: Git -> Ref -> Bool -> IO (Maybe ObjectInfo)
+getObjectRaw :: GitFile -> Ref -> Bool -> IO (Maybe ObjectInfo)
 getObjectRaw git ref resolveDelta = do
     loc <- findReference git ref
     getObjectRawAt git loc resolveDelta
 
 -- | get an object type from repository
-getObjectType :: Git -> Ref -> IO (Maybe ObjectType)
+getObjectType :: GitFile -> Ref -> IO (Maybe ObjectType)
 getObjectType git ref = findReference git ref >>= getObjectTypeAt
   where getObjectTypeAt NotFound        = return Nothing
-        getObjectTypeAt (Loose _)       = Just . (\(t,_,_) -> t) <$> looseReadHeader (gitRepoPath git) ref
+        getObjectTypeAt (Loose _)       = Just . (\(t,_,_) -> t) <$> looseReadHeader (gitFilePath git) ref
         getObjectTypeAt (Packed pref o) =
             fmap ((\(ty,_,_) -> ty) . oiHeader) <$> readFromPack git pref o True
 
 -- | get an object from repository using a location to reference it.
-getObjectAt :: Git -> ObjectLocation -> Bool -> IO (Maybe Object)
+getObjectAt :: GitFile -> ObjectLocation -> Bool -> IO (Maybe Object)
 getObjectAt git loc resolveDelta = maybe Nothing toObj <$> getObjectRawAt git loc resolveDelta
   where toObj (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
 
@@ -320,8 +338,11 @@ getObject :: Git               -- ^ repository
           -> Ref               -- ^ the object's reference to
           -> Bool              -- ^ whether to resolve deltas if found
           -> IO (Maybe Object) -- ^ returned object if found
+getObject git ref resolveDelta = objectReader git ref resolveDelta
+{-
 getObject git ref resolveDelta = maybe Nothing toObj <$> getObjectRaw git ref resolveDelta
   where toObj (ObjectInfo { oiHeader = (ty, _, extra), oiData = objData }) = packObjectFromRaw (ty, extra, objData)
+  -}
 
 -- | Just like 'getObject' but will raise a RefNotFound exception if the
 -- reference cannot be found.
@@ -337,4 +358,4 @@ getObject_ git ref resolveDelta = maybe (throwIO $ RefNotFound ref) return
 setObject :: Git
           -> Object
           -> IO Ref
-setObject git obj = looseWrite (gitRepoPath git) obj
+setObject git obj = objectWriter git obj

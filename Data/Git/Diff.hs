@@ -92,7 +92,7 @@ buildListForDiff git ref = do
 
         catBlobFile :: Ref -> IO L.ByteString
         catBlobFile blobRef = do
-            mobj <- getObjectRaw git blobRef True
+            mobj <- getObjectRaw (gitFileBackend git) blobRef True
             case mobj of
                 Nothing  -> error "not a valid object"
                 Just obj -> return $ oiData obj

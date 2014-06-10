@@ -100,7 +100,7 @@ getTree git ref = maybe err id . objectToTree <$> getObject_ git ref True
 -- for example: HEAD, HEAD^, master~3, shortRef
 resolveRevision :: Git -> Revision -> IO (Maybe Ref)
 resolveRevision git (Revision prefix modifiers) =
-    getCacheVal (packedNamed git) >>= \c -> resolvePrefix c >>= modf modifiers
+    getCacheVal (packedNamed $ gitFileBackend git) >>= \c -> resolvePrefix c >>= modf modifiers
   where
         resolvePrefix lookupCache = tryResolvers
               [resolveNamedPrefix lookupCache namedResolvers
@@ -138,7 +138,7 @@ resolveRevision git (Revision prefix modifiers) =
 
         resolvePrePrefix :: IO (Maybe Ref)
         resolvePrePrefix = do
-            refs <- findReferencesWithPrefix git prefix
+            refs <- findReferencesWithPrefix (gitFileBackend git) prefix
             case refs of
                 []  -> return Nothing
                 [r] -> return (Just r)
@@ -213,7 +213,7 @@ rewrite git mapCommit revision nbParent = do
 buildHTree :: Git -> Tree -> IO HTree
 buildHTree git (Tree ents) = mapM resolveTree ents
   where resolveTree (perm, ent, ref) = do
-            obj <- getObjectType git ref
+            obj <- getObjectType (gitFileBackend git) ref
             case obj of
                 Just TypeBlob -> return (perm, ent, TreeFile ref)
                 Just TypeTree -> do ctree <- getTree git ref
@@ -252,7 +252,7 @@ branchWrite git branchName ref =
 -- | Return the list of branches
 branchList :: Git -> IO (Set RefName)
 branchList git = do
-    ps <- Set.fromList . M.keys . packedBranchs <$> getCacheVal (packedNamed git)
+    ps <- Set.fromList . M.keys . packedBranchs <$> getCacheVal (packedNamed $ gitFileBackend git)
     ls <- Set.fromList <$> looseHeadsList (gitRepoPath git)
     return $ Set.union ps ls
 
@@ -267,7 +267,7 @@ tagWrite git tagname ref =
 -- | Return the list of branches
 tagList :: Git -> IO (Set RefName)
 tagList git = do
-    ps <- Set.fromList . M.keys . packedTags <$> getCacheVal (packedNamed git)
+    ps <- Set.fromList . M.keys . packedTags <$> getCacheVal (packedNamed $ gitFileBackend git)
     ls <- Set.fromList <$> looseTagsList (gitRepoPath git)
     return $ Set.union ps ls
 

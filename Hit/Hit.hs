@@ -42,13 +42,14 @@ verifyPack pref git = do
     offsets     <- H.new
     tree        <- H.new
     refs        <- newIORef M.empty
-    entries     <- fromIntegral <$> packReadHeader (gitRepoPath git) pref
+    entries     <- fromIntegral <$> packReadHeader (gitFilePath gitbackend) pref
     leftParsed  <- newIORef entries
     -- enumerate all objects either directly in tree for fully formed objects
     -- or a list of delta to resolves
-    packEnumerateObjects (gitRepoPath git) pref entries (setObj leftParsed refs offsets tree)
+    packEnumerateObjects (gitFilePath gitbackend) pref entries (setObj leftParsed refs offsets tree)
     readIORefAndReplace refs M.empty >>= dumpTree offsets tree
   where
+        gitbackend = gitFileBackend git
         readIORefAndReplace ioref emptyVal = do
             v <- readIORef ioref
             writeIORef ioref emptyVal
@@ -58,7 +59,7 @@ verifyPack pref git = do
             | objectTypeIsDelta (poiType info) = do
                 (!ty, !ref, !ptr, !lenChain) <- do
                     let loc = Packed pref (poiOffset info)
-                    objInfo <- maybe (error "cannot find delta chain") id <$> getObjectRawAt git loc True
+                    objInfo <- maybe (error "cannot find delta chain") id <$> getObjectRawAt gitbackend loc True
                     let (ty, sz, _) = oiHeader objInfo
                     let !ref = objectHash ty sz (oiData objInfo)
                     let ptr = head $ oiChains objInfo -- it's safe since deltas always have a non empty valid chain
@@ -114,7 +115,7 @@ catFile ty ref git = do
                         "tree"   -> Just TypeTree
                         "-t"     -> Nothing
                         _        -> error "unknown type request"
-    mobj <- getObjectRaw git ref True
+    mobj <- getObjectRaw (gitFileBackend git) ref True
     case mobj of
         Nothing  -> error "not a valid object"
         Just obj ->
