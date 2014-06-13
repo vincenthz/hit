@@ -115,7 +115,7 @@ catFile ty ref git = do
                         "tree"   -> Just TypeTree
                         "-t"     -> Nothing
                         _        -> error "unknown type request"
-    mobj <- getObjectRaw (gitFileBackend git) ref True
+    mobj <- getObjectRaw git ref True
     case mobj of
         Nothing  -> error "not a valid object"
         Just obj ->
