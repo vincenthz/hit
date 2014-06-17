@@ -56,6 +56,7 @@ Library
                      Data.Git.Storage.Pack
                      Data.Git.Storage.Object
                      Data.Git.Storage.Loose
+                     Data.Git.Storage.FileBackend
                      Data.Git.Named
                      Data.Git.Delta
                      Data.Git.Ref
@@ -68,6 +69,7 @@ Library
                      Data.Git.Storage.FileWriter
                      Data.Git.Storage.CacheFile
                      Data.Git.Path
+                     Data.Git.Storage.Backend
   ghc-options:       -Wall -fno-warn-missing-signatures
 
 Executable           Hit

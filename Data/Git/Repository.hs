@@ -53,15 +53,8 @@ import Data.Git.Types
 import Data.Git.Storage.Object
 import Data.Git.Storage
 import Data.Git.Revision
-import Data.Git.Storage.Loose
-import Data.Git.Storage.CacheFile
 import Data.Git.Ref
 import qualified Data.Git.Config as Cfg
-
-import Data.Set (Set)
-
-import qualified Data.Map as M
-import qualified Data.Set as Set
 
 -- | hierarchy tree, either a reference to a blob (file) or a tree (directory).
 data HTreeEnt = TreeDir Ref HTree | TreeFile Ref
@@ -99,30 +92,19 @@ getTree git ref = maybe err id . objectToTree <$> getObject_ git ref True
 -- | try to resolve a string to a specific commit ref
 -- for example: HEAD, HEAD^, master~3, shortRef
 resolveRevision :: Git -> Revision -> IO (Maybe Ref)
-resolveRevision git (Revision prefix modifiers) =
-    getCacheVal (packedNamed $ gitFileBackend git) >>= \c -> resolvePrefix c >>= modf modifiers
+resolveRevision git (Revision prefix modifiers) = resolvePrefix >>= modf modifiers
   where
-        resolvePrefix lookupCache = tryResolvers
-              [resolveNamedPrefix lookupCache namedResolvers
+        resolvePrefix = tryResolvers
+              [resolveNamedPrefix namedResolvers
               ,resolvePrePrefix
               ]
 
-        resolveNamedPrefix _           []     = return Nothing
-        resolveNamedPrefix lookupCache (x:xs) = followToRef (resolveNamedPrefix lookupCache xs) x
-          where followToRef onFailure refty = do
-                    exists <- existsRefFile (gitRepoPath git) refty
-                    if exists
-                        then do refcont <- readRefFile (gitRepoPath git) refty
-                                case refcont of
-                                     RefDirect ref     -> return $ Just ref
-                                     RefLink refspecty -> followToRef onFailure refspecty
-                                     _                 -> error "cannot handle reference content"
-                        else case refty of
-                                RefTag name    -> mapLookup name $ packedTags lookupCache
-                                RefBranch name -> mapLookup name $ packedBranchs lookupCache
-                                RefRemote name -> mapLookup name $ packedRemotes lookupCache
-                                _              -> return Nothing
-                  where mapLookup name m = maybe onFailure (return . Just) $ M.lookup name m
+        resolveNamedPrefix []     = return Nothing
+        resolveNamedPrefix (x:xs) = do
+            r <- refRead git x
+            case r of
+                Nothing  -> resolveNamedPrefix xs
+                Just ref -> return $ Just ref
 
         namedResolvers = case prefix of
                              "HEAD"       -> [ RefHead ]
@@ -138,7 +120,7 @@ resolveRevision git (Revision prefix modifiers) =
 
         resolvePrePrefix :: IO (Maybe Ref)
         resolvePrePrefix = do
-            refs <- findReferencesWithPrefix (gitFileBackend git) prefix
+            refs <- objectFindPrefix git prefix
             case refs of
                 []  -> return Nothing
                 [r] -> return (Just r)
@@ -201,19 +183,19 @@ rewrite git mapCommit revision nbParent = do
 
         process [] = error "nothing to rewrite"
         process ((_,commit):next) =
-                    mapCommit commit >>= looseWrite (gitRepoPath git) . toObject >>= flip rewriteOne next
+                    mapCommit commit >>= objectSet git . toObject >>= flip rewriteOne next
 
         rewriteOne prevRef [] = return prevRef
         rewriteOne prevRef ((_,commit):next) = do
                     newCommit <- mapCommit $ commit { commitParents = [prevRef] }
-                    ref       <- looseWrite (gitRepoPath git) (toObject newCommit)
+                    ref       <- objectSet git (toObject newCommit)
                     rewriteOne ref next
 
 -- | build a hierarchy tree from a tree object
 buildHTree :: Git -> Tree -> IO HTree
 buildHTree git (Tree ents) = mapM resolveTree ents
   where resolveTree (perm, ent, ref) = do
-            obj <- getObjectType (gitFileBackend git) ref
+            obj <- objectType git ref
             case obj of
                 Just TypeBlob -> return (perm, ent, TreeFile ref)
                 Just TypeTree -> do ctree <- getTree git ref
@@ -241,56 +223,6 @@ resolvePath git commitRef paths =
         findEnt x = find (\(_, b, _) -> b == x)
         treeEntRef (_,_,r) = r
 
--- | Write a branch to point to a specific reference
-branchWrite :: Git     -- ^ repository
-            -> RefName -- ^ the name of the branch to write
-            -> Ref     -- ^ the reference to set
-            -> IO ()
-branchWrite git branchName ref =
-    writeRefFile (gitRepoPath git) (RefBranch branchName) (RefDirect ref)
-
--- | Return the list of branches
-branchList :: Git -> IO (Set RefName)
-branchList git = do
-    ps <- Set.fromList . M.keys . packedBranchs <$> getCacheVal (packedNamed $ gitFileBackend git)
-    ls <- Set.fromList <$> looseHeadsList (gitRepoPath git)
-    return $ Set.union ps ls
-
--- | Write a tag to point to a specific reference
-tagWrite :: Git     -- ^ repository
-         -> RefName -- ^ the name of the tag to write
-         -> Ref     -- ^ the reference to set
-         -> IO ()
-tagWrite git tagname ref =
-    writeRefFile (gitRepoPath git) (RefTag tagname) (RefDirect ref)
-
--- | Return the list of branches
-tagList :: Git -> IO (Set RefName)
-tagList git = do
-    ps <- Set.fromList . M.keys . packedTags <$> getCacheVal (packedNamed $ gitFileBackend git)
-    ls <- Set.fromList <$> looseTagsList (gitRepoPath git)
-    return $ Set.union ps ls
-
--- | Set head to point to either a reference or a branch name.
-headSet :: Git                -- ^ repository
-        -> Either Ref RefName -- ^ either a raw reference or a branch name
-        -> IO ()
-headSet git (Left ref)      =
-    writeRefFile (gitRepoPath git) RefHead (RefDirect ref)
-headSet git (Right refname) =
-    writeRefFile (gitRepoPath git) RefHead (RefLink $ RefBranch refname)
-
--- | Get what the head is pointing to, or the reference otherwise
-headGet :: Git
-        -> IO (Either Ref RefName)
-headGet git = do
-    content <- readRefFile (gitRepoPath git) RefHead
-    case content of
-        RefLink (RefBranch b) -> return $ Right b
-        RefLink spec          -> error ("unknown content link in HEAD: " ++ show spec)
-        RefDirect r           -> return $ Left r
-        RefContentUnknown bs  -> error ("unknown content in HEAD: " ++ show bs)
-
 -- | Read the Config
 configRead :: Git -> IO Cfg.Config
-configRead git = Cfg.readConfig (gitRepoPath git)
+configRead git = configGet git

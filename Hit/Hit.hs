@@ -16,6 +16,7 @@ import Data.Maybe
 import Data.Git.Storage.Pack
 import Data.Git.Storage.Object
 import Data.Git.Storage
+import Data.Git.Storage.FileBackend
 import Data.Git.Types
 import Data.Git.Ref
 import Data.Git.Repository
@@ -49,7 +50,7 @@ verifyPack pref git = do
     packEnumerateObjects (gitFilePath gitbackend) pref entries (setObj leftParsed refs offsets tree)
     readIORefAndReplace refs M.empty >>= dumpTree offsets tree
   where
-        gitbackend = gitFileBackend git
+        gitbackend = gitBackend git
         readIORefAndReplace ioref emptyVal = do
             v <- readIORef ioref
             writeIORef ioref emptyVal
