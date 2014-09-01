@@ -33,7 +33,6 @@ import Data.Git.Repository
 import Data.Git.Storage
 import Data.Git.Storage.Object
 import Data.ByteString.Lazy.Char8 as L
-import Data.ByteString.Char8 as BS
 
 import Data.Algorithm.Patience as AP (Item(..), diff)
 
@@ -45,7 +44,7 @@ data BlobContent = FileContent [L.ByteString] -- ^ Text file's lines
 
 -- | This is a blob description at a given state (revision)
 data BlobState = BlobState
-    { bsFilename :: BS.ByteString
+    { bsFilename :: EntPath
     , bsMode     :: ModePerm
     , bsRef      :: Ref
     , bsContent  :: BlobContent
@@ -73,21 +72,21 @@ buildListForDiff git ref = do
     tree   <- resolveTreeish git $ commitTreeish commit
     case tree of
         Just t -> do htree <- buildHTree git t
-                     buildTreeList htree (BS.empty)
+                     buildTreeList htree []
         _      -> error "cannot build a tree from this reference"
     where
-        buildTreeList :: HTree -> BS.ByteString -> IO [BlobState]
+        buildTreeList :: HTree -> EntPath -> IO [BlobState]
         buildTreeList [] _ = return []
-        buildTreeList ((d,n,TreeFile r):xs)  pathPrefix = do
+        buildTreeList ((d,n,TreeFile r):xs) pathPrefix = do
             content <- catBlobFile r
             let isABinary = isBinaryFile content
             listTail <- buildTreeList xs pathPrefix
             case isABinary of
-                False -> return $ (BlobState (BS.append pathPrefix n) d r (FileContent $ L.lines content)) : listTail
-                True  -> return $ (BlobState (BS.append pathPrefix n) d r (BinaryContent content)) : listTail
+                False -> return $ (BlobState (entPathAppend pathPrefix n) d r (FileContent $ L.lines content)) : listTail
+                True  -> return $ (BlobState (entPathAppend pathPrefix n) d r (BinaryContent content)) : listTail
         buildTreeList ((_,n,TreeDir _ subTree):xs) pathPrefix = do
             l1 <- buildTreeList xs      pathPrefix
-            l2 <- buildTreeList subTree (BS.concat [pathPrefix, n, BS.pack "/"])
+            l2 <- buildTreeList subTree (entPathAppend pathPrefix n)
             return $ l1 ++ l2
 
         catBlobFile :: Ref -> IO L.ByteString
@@ -187,7 +186,7 @@ data HitFileRef = NewRef        Ref
 --   * the file's mode (i.e. the file priviledge)
 --   * the file's ref
 data HitDiff = HitDiff
-    { hFileName    :: BS.ByteString
+    { hFileName    :: EntPath
     , hFileContent :: HitFileContent
     , hFileMode    :: HitFileMode
     , hFileRef     :: HitFileRef

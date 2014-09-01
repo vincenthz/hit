@@ -17,6 +17,10 @@ module Data.Git.Types
     , Blob(..)
     , Tag(..)
     , Person(..)
+    , EntName
+    , entName
+    , EntPath
+    , entPathAppend
     -- * modeperm type
     , ModePerm(..)
     , FilePermissions(..)
@@ -36,7 +40,9 @@ module Data.Git.Types
 
 import Data.Word
 import Data.Bits
+import Data.Byteable
 import Data.Monoid
+import Data.String
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 
@@ -47,6 +53,7 @@ import Data.Hourglass (Elapsed, TimezoneOffset(..)
                       , Time(..), Timeable(..)
                       , LocalTime, localTimeSetTimezone, localTimeFromGlobal)
 import Data.Data
+import qualified Data.ByteString.UTF8 as UTF8
 
 -- | type of a git object.
 data ObjectType =
@@ -138,10 +145,29 @@ data FilePermissions = FilePermissions
 -- * bit 2 represents the execute permission
 type Perm = Word8
 
+-- | Entity name
+newtype EntName = EntName ByteString
+    deriving (Eq,Ord)
+instance Show EntName where
+    show (EntName e) = UTF8.toString e
+instance IsString EntName where
+    fromString s = EntName $ UTF8.fromString s
+instance Byteable EntName where
+    toBytes (EntName n) = n
+
+-- FIXME check it doesn't contains '/'
+entName :: ByteString -> EntName
+entName = EntName
+
+entPathAppend :: EntPath -> EntName -> EntPath
+entPathAppend l e = l ++ [e]
+
+type EntPath = [EntName]
+
 -- | represent one entry in the tree
 -- (permission,file or directory name,blob or tree ref)
 -- name should maybe a filepath, but not sure about the encoding.
-type TreeEnt = (ModePerm,ByteString,Ref)
+type TreeEnt = (ModePerm,EntName,Ref)
 
 -- | an author or committer line
 -- has the format: name <email> time timezone

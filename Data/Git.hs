@@ -18,6 +18,10 @@ module Data.Git
     , Tag(..)
     , GitTime
     , ModePerm(..)
+    , EntName
+    , EntPath
+    , entName
+    , entPathAppend
 
     -- * Helper & type related to ModePerm
     , ObjectFileType(..)

@@ -65,7 +65,7 @@ import qualified Data.Set as Set
 
 -- | hierarchy tree, either a reference to a blob (file) or a tree (directory).
 data HTreeEnt = TreeDir Ref HTree | TreeFile Ref
-type HTree = [(ModePerm,ByteString,HTreeEnt)]
+type HTree = [(ModePerm,EntName,HTreeEnt)]
 
 -- | Exception when trying to convert an object pointed by 'Ref' to
 -- a type that is different
@@ -223,13 +223,13 @@ buildHTree git (Tree ents) = mapM resolveTree ents
                 Nothing       -> error "unknown reference in tree object"
 
 -- | resolve the ref (tree or blob) related to a path at a specific commit ref
-resolvePath :: Git            -- ^ repository
-            -> Ref            -- ^ commit reference
-            -> [ByteString]   -- ^ paths
+resolvePath :: Git     -- ^ repository
+            -> Ref     -- ^ commit reference
+            -> EntPath -- ^ paths
             -> IO (Maybe Ref)
 resolvePath git commitRef paths =
     getCommit git commitRef >>= \commit -> resolve (commitTreeish commit) paths
-  where resolve :: Ref -> [ByteString] -> IO (Maybe Ref)
+  where resolve :: Ref -> EntPath -> IO (Maybe Ref)
         resolve treeRef []     = return $ Just treeRef
         resolve treeRef (x:xs) = do
             (Tree ents) <- getTree git treeRef

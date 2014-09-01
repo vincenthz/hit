@@ -43,6 +43,7 @@ module Data.Git.Storage.Object
 import Data.Git.Ref
 import Data.Git.Types
 
+import Data.Byteable (toBytes)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -182,7 +183,8 @@ referenceBin = fromBinary <$> P.take 20
 -- | parse a tree content
 treeParse = Tree <$> parseEnts
     where parseEnts = atEnd >>= \end -> if end then return [] else liftM2 (:) parseEnt parseEnts
-          parseEnt = liftM3 (,,) modeperm (PC.char ' ' >> takeTill ((==) 0)) (word8 0 >> referenceBin)
+          parseEnt = liftM3 (,,) modeperm parseEntName (word8 0 >> referenceBin)
+          parseEntName = entName <$> (PC.char ' ' >> takeTill ((==) 0))
 
 -- | parse a blob content
 blobParse = (Blob <$> takeLazyByteString)
@@ -259,7 +261,7 @@ treeWrite (Tree ents) = toLazyByteString $ mconcat $ concatMap writeTreeEnt ents
     where writeTreeEnt (ModePerm perm,name,ref) =
                 [ string7 (printf "%o" perm)
                 , string7 " "
-                , byteString name
+                , byteString $ toBytes name
                 , string7 "\0"
                 , byteString $ toBinary ref
                 ]
