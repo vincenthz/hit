@@ -59,6 +59,15 @@ module Data.Git
     , setObject
     , toObject
 
+    -- * Work trees
+    , WorkTree
+    , EntType(..)
+    , workTreeNew
+    , workTreeFrom
+    , workTreeDelete
+    , workTreeSet
+    , workTreeFlush
+
     -- * Named refs
     , branchWrite
     , branchList
@@ -74,3 +83,4 @@ import Data.Git.Storage
 import Data.Git.Repository
 import Data.Git.Revision
 import Data.Git.Storage.Object (toObject)
+import Data.Git.WorkTree

@@ -70,6 +70,7 @@ Library
                      Data.Git.Storage.FileWriter
                      Data.Git.Storage.CacheFile
                      Data.Git.Path
+                     Data.Git.WorkTree
   ghc-options:       -Wall -fno-warn-missing-signatures
 
 Executable           Hit
