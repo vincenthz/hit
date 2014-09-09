@@ -150,7 +150,7 @@ isRepo path = do
     dir     <- isDirectory path
     subDirs <- mapM (isDirectory . (path </>))
                     [ "hooks", "info"
-                    , "logs", "objects", "refs"
+                    , "objects", "refs"
                     , "refs"</> "heads", "refs"</> "tags"]
     return $ and ([dir] ++ subDirs)
 
