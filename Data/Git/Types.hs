@@ -44,6 +44,7 @@ import Data.Byteable
 import Data.Monoid
 import Data.String
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 
 import Data.Git.Ref
@@ -151,13 +152,15 @@ newtype EntName = EntName ByteString
 instance Show EntName where
     show (EntName e) = UTF8.toString e
 instance IsString EntName where
-    fromString s = EntName $ UTF8.fromString s
+    fromString s = entName $ UTF8.fromString s
 instance Byteable EntName where
     toBytes (EntName n) = n
 
--- FIXME check it doesn't contains '/'
 entName :: ByteString -> EntName
-entName = EntName
+entName bs
+    | B.elem slash bs = error ("entity name " ++ show bs ++ " contains an invalid '/' character")
+    | otherwise       = EntName bs
+  where slash = 47
 
 entPathAppend :: EntPath -> EntName -> EntPath
 entPathAppend l e = l ++ [e]
