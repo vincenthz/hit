@@ -7,16 +7,25 @@
 --
 -- config related types and methods.
 --
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Git.Config
     ( Config(..)
     , Section(..)
-    -- * methods
+    -- * reading methods
     , readConfig
+    , readGlobalConfig
+    -- * methods
+    , listSections
+    , get
     ) where
 
 import Control.Applicative
+import Control.Monad (mplus)
 import Data.Git.Path
+import Data.List (find)
 import Filesystem.Path.CurrentOS
+import Filesystem (getHomeDirectory)
+import qualified Data.Set as S
 
 newtype Config = Config [Section]
     deriving (Show,Eq)
@@ -56,3 +65,18 @@ parseConfig = Config . reverse . toSections . foldl accSections ([], Nothing) . 
 
 readConfigPath filepath = parseConfig <$> readFile (encodeString filepath)
 readConfig gitRepo = readConfigPath (configPath gitRepo)
+
+readGlobalConfig = getHomeDirectory >>= readConfigPath . (\homeDir -> homeDir </> ".gitconfig")
+
+listSections :: [Config] -> [String]
+listSections = S.toList . foldr accSections S.empty
+  where accSections (Config sections) set = foldr S.insert set (map sectionName sections)
+
+-- | Get a configuration element in a stack of config file, starting from the top.
+get :: [Config] -- ^ stack of config
+    -> String   -- ^ section name
+    -> String   -- ^ key name
+    -> Maybe String
+get []            _       _   = Nothing
+get (Config c:cs) section key = findOne `mplus` get cs section key
+  where findOne = find (\s -> sectionName s == section) c >>= lookup key . sectionKVs

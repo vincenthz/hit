@@ -11,9 +11,10 @@
 module Data.Git.Repository
     ( Git
     -- * Config
-    , configRead
-    , Cfg.Config(..)
-    , Cfg.Section(..)
+    , configGetAll
+    , configGet
+    , Config(..)
+    , Section(..)
     -- * Trees
     , HTree
     , HTreeEnt(..)
@@ -45,8 +46,7 @@ import Control.Exception (Exception, throw)
 import Data.Maybe (fromMaybe)
 import Data.List (find)
 import Data.Data
-
-import Data.ByteString (ByteString)
+import Data.IORef
 
 import Data.Git.Named
 import Data.Git.Types
@@ -56,6 +56,7 @@ import Data.Git.Revision
 import Data.Git.Storage.Loose
 import Data.Git.Storage.CacheFile
 import Data.Git.Ref
+import Data.Git.Config (Config(..), Section(..))
 import qualified Data.Git.Config as Cfg
 
 import Data.Set (Set)
@@ -292,5 +293,20 @@ headGet git = do
         RefContentUnknown bs  -> error ("unknown content in HEAD: " ++ show bs)
 
 -- | Read the Config
-configRead :: Git -> IO Cfg.Config
-configRead git = Cfg.readConfig (gitRepoPath git)
+configGetAll :: Git -> IO [Config]
+configGetAll git = readIORef (configs git)
+
+-- | Get a configuration element from the config file, starting from the
+-- local repository config file, then the global config file.
+--
+-- for example the equivalent to git config user.name is:
+--
+-- > configGet git "user" "name"
+--
+configGet :: Git               -- ^ Git context
+          -> String            -- ^ section name
+          -> String            -- ^ key name
+          -> IO (Maybe String) -- ^ The resulting value if it exists
+configGet git section key = do
+    cfgs <- configGetAll git
+    return $ Cfg.get cfgs section key

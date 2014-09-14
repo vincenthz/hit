@@ -12,6 +12,7 @@ module Data.Git.Storage
     ( Git
     , packedNamed
     , gitRepoPath
+    , configs
     -- * opening repositories
     , openRepo
     , closeRepo
@@ -45,13 +46,14 @@ import Filesystem.Path hiding (concat)
 import Filesystem.Path.Rules
 import System.Environment
 
-import Control.Applicative ((<$>))
+import Control.Applicative
 import Control.Exception
 import qualified Control.Exception as E
 import Control.Monad
 
 import Data.String
 import Data.List ((\\), isPrefixOf)
+import Data.Either (partitionEithers)
 import Data.IORef
 import Data.Word
 
@@ -65,6 +67,7 @@ import Data.Git.Storage.Pack
 import Data.Git.Storage.Loose
 import Data.Git.Storage.CacheFile
 import Data.Git.Ref
+import Data.Git.Config
 
 import qualified Data.Map as M
 
@@ -82,14 +85,22 @@ data Git = Git
     , indexReaders :: IORef [(Ref, PackIndexReader)]
     , packReaders  :: IORef [(Ref, FileReader)]
     , packedNamed  :: CachedPackedRef
+    , configs      :: IORef [Config]
     }
 
 -- | open a new git repository context
 openRepo :: FilePath -> IO Git
-openRepo path = liftM3 (Git path) (newIORef []) (newIORef []) packedRef
-    where packedRef = newCacheVal (packedRefsPath path)
-                                  (readPackedRefs path M.fromList)
-                                  (PackedRefs M.empty M.empty M.empty)
+openRepo path = Git path <$> newIORef []
+                         <*> newIORef []
+                         <*> packedRef
+                         <*> (readConfigs >>= newIORef)
+  where packedRef = newCacheVal (packedRefsPath path)
+                                (readPackedRefs path M.fromList)
+                                (PackedRefs M.empty M.empty M.empty)
+        readConfigs = do
+            global <- E.try readGlobalConfig :: IO (Either IOException Config)
+            local  <- E.try (readConfig path)
+            return $ snd $ partitionEithers [local,global]
 
 -- | close a git repository context, closing all remaining fileReaders.
 closeRepo :: Git -> IO ()

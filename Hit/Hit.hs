@@ -235,7 +235,8 @@ main = do
         ["diff",rev1,rev2]   -> withCurrentRepo $ showDiff (fromString rev1) (fromString rev2)
         ["tag"]              -> withCurrentRepo $ showRefs
         ["show-refs"]        -> withCurrentRepo $ showRefs
-        ["read-config"]      -> withCurrentRepo $ \git -> configRead git >>= putStrLn . show
+        ["read-config"]      -> withCurrentRepo $ \git -> configGetAll git >>= putStrLn . show
+        ["config",section,value] -> withCurrentRepo $ \git -> configGet git section value >>= putStrLn . show
         cmd : [] -> error ("unknown command: " ++ cmd)
         []       -> error "no args"
         _        -> error "unknown command line arguments"
