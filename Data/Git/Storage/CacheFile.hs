@@ -14,8 +14,8 @@ import qualified Control.Exception as E
 import Filesystem.Path
 import Filesystem.Path.CurrentOS (encodeString)
 import Prelude hiding (FilePath)
-import System.Posix.Files (getFileStatus, modificationTime)
-import System.Posix.Types (EpochTime)
+import System.PosixCompat.Files (getFileStatus, modificationTime)
+import System.PosixCompat.Types (EpochTime)
 
 data CacheFile a = CacheFile
     { cacheFilepath :: FilePath

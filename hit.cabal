@@ -47,7 +47,7 @@ Library
                    , zlib
                    , zlib-bindings >= 0.1 && < 0.2
                    , hourglass >= 0.2
-                   , unix
+                   , unix-compat
                    , patience
   Exposed-modules:   Data.Git
                      Data.Git.Types
