@@ -1,6 +1,5 @@
-import Test.QuickCheck
-import Test.Framework(defaultMain, testGroup, buildTest)
-import Test.Framework.Providers.QuickCheck2(testProperty)
+import Test.Tasty
+import Test.Tasty.QuickCheck
 
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B

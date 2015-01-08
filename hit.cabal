@@ -102,11 +102,9 @@ Test-Suite test-unit
   hs-source-dirs:    Tests
   Main-Is:           Tests.hs
   Build-depends:     base >= 3 && < 7
-                   , HUnit
-                   , QuickCheck >= 2
                    , bytestring
-                   , test-framework >= 0.3
-                   , test-framework-quickcheck2 >= 0.2
+                   , tasty
+                   , tasty-quickcheck
                    , hourglass
                    , hit
 
@@ -115,11 +113,9 @@ Test-Suite test-repository
   hs-source-dirs:    Tests
   Main-Is:           Repo.hs
   Build-depends:     base >= 3 && < 7
-                   , HUnit
-                   , QuickCheck >= 2
                    , bytestring
-                   , test-framework >= 0.3
-                   , test-framework-quickcheck2 >= 0.2
+                   , tasty
+                   , tasty-quickcheck
                    , hourglass
                    , bytedump >= 1.0
                    , hit

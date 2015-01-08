@@ -1,6 +1,5 @@
-import Test.QuickCheck
-import Test.Framework(defaultMain, testGroup)
-import Test.Framework.Providers.QuickCheck2(testProperty)
+import Test.Tasty.QuickCheck
+import Test.Tasty
 
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
@@ -26,10 +25,15 @@ instance Show ObjNoDelta where
 
 arbitraryBS size = B.pack . map fromIntegral <$> replicateM size (choose (0,255) :: Gen Int)
 arbitraryBSno0 size = B.pack . map fromIntegral <$> replicateM size (choose (1,255) :: Gen Int)
-
 arbitraryBSasciiNoSpace size = B.pack . map fromIntegral <$> replicateM size (choose (0x21,0x7f) :: Gen Int)
 arbitraryBSascii size = B.pack . map fromIntegral <$> replicateM size (choose (0x20,0x7f) :: Gen Int)
 arbitraryBSnoangle size = B.pack . map fromIntegral <$> replicateM size (choose (0x40,0x7f) :: Gen Int)
+
+arbitraryEntname size = entName . B.pack . map fromIntegral <$> replicateM size range
+  where range :: Gen Int
+        range = oneof [ choose (0x21, 0x2e) -- remove 0x2f (slash)
+                      , choose (0x30, 0x7f)
+                      ]
 
 instance Arbitrary Ref where
     arbitrary = fromBinary <$> arbitraryBS 20
@@ -40,7 +44,8 @@ arbitraryLazy = L.fromChunks . (:[]) <$> arbitraryBS 40
 arbitraryRefList :: Gen [Ref]
 arbitraryRefList = replicateM 2 arbitrary
 
-arbitraryEnt = liftM3 (,,) arbitrary (arbitraryBSno0 48) arbitrary
+arbitraryEnt :: Gen TreeEnt
+arbitraryEnt = liftM3 (,,) arbitrary (arbitraryEntname 23) arbitrary
 arbitraryEnts = choose (1,2) >>= \i -> replicateM i arbitraryEnt
 
 instance Arbitrary TimezoneOffset where
@@ -99,7 +104,7 @@ objTests =
     [ testProperty "unmarshall.marshall==id" prop_object_marshalling_id
     ]
 
-main = defaultMain
+main = defaultMain $ testGroup "hit"
     [ testGroup "ref marshalling" refTests
     , testGroup "object marshalling" objTests
     ]
