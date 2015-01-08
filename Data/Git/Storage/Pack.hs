@@ -20,7 +20,7 @@ module Data.Git.Storage.Pack
         , packReadAtOffset
         , packReadRawAtOffset
         , packEnumerateObjects
-        -- * turn a packed object into a 
+        -- * turn a packed object into a
         , packedObjectToObject
         , packObjectFromRaw
         ) where
@@ -64,10 +64,11 @@ data PackedObjectInfo = PackedObjectInfo
 
 -- | Enumerate the pack refs available in this repository.
 packEnumerate repoPath = map onlyHash . filter isPackFile . map (encodeString posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
-        where
-                isPackFile x = ".pack" `isSuffixOf` x
-                onlyHash = fromHexString . takebut 5 . drop 5
-                takebut n l = take (length l - n) l
+  where
+        isPackFile :: String -> Bool
+        isPackFile x = ".pack" `isSuffixOf` x
+        onlyHash = fromHexString . takebut 5 . drop 5
+        takebut n l = take (length l - n) l
 
 -- | open a pack
 packOpen :: FilePath -> Ref -> IO FileReader

@@ -56,6 +56,7 @@ instance Show Revision where
 instance IsString Revision where
     fromString = revFromString
 
+revFromString :: String -> Revision
 revFromString s = either (error.show) id $ parse parser "" s
   where parser = do
                 p    <- many (noneOf "^~@")

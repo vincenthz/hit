@@ -63,10 +63,11 @@ data PackIndex = PackIndex
 
 -- | enumerate every indexes file in the pack directory
 packIndexEnumerate repoPath = map onlyHash . filter isPackFile . map (encodeString posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
-        where
-                isPackFile x = ".idx" `isSuffixOf` x && "pack-" `isPrefixOf` x
-                onlyHash = fromHexString . takebut 4 . drop 5
-                takebut n l = take (length l - n) l
+  where
+        isPackFile :: String -> Bool
+        isPackFile x = ".idx" `isSuffixOf` x && "pack-" `isPrefixOf` x
+        onlyHash = fromHexString . takebut 4 . drop 5
+        takebut n l = take (length l - n) l
 
 -- | open an index
 packIndexOpen :: FilePath -> Ref -> IO FileReader
