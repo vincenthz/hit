@@ -19,7 +19,7 @@ Maintainer:          Vincent Hanquez <vincent@snarc.org>
 Category:            Development
 Stability:           experimental
 Build-Type:          Simple
-Homepage:            http://github.com/vincenthz/hit
+Homepage:            https://github.com/vincenthz/hit
 Cabal-Version:       >=1.8
 data-files:          README.md
 extra-source-files:  Tests/*.hs
@@ -122,4 +122,4 @@ Test-Suite test-repository
 
 source-repository head
   type: git
-  location: git://github.com/vincenthz/hit
+  location: https://github.com/vincenthz/hit
