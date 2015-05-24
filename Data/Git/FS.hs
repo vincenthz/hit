@@ -132,16 +132,23 @@ data CommitPrecedent
         -- ^ start a new commit with no files already included into
         -- the commit Tree, no Ref in the parents list and no RefName to update.
 
-commitPrecedentToBlobsMap :: Git -> CommitPrecedent -> IO (Either String BlobsMap)
+data TreeStatus
+    = TreeNotLoaded Ref
+        -- ^ the ref of a Tree that has not been loaded
+    | TreeReadOnly  Ref BlobsMap
+        -- ^ the ref of a Tree and the BlobsMap
+        -- no modification has been performed to the blobs map
+    | TreeReadWrite BlobsMap
+        -- ^ a new blobs map
+
+commitPrecedentToBlobsMap :: Git -> CommitPrecedent -> IO (Either String TreeStatus)
 commitPrecedentToBlobsMap git cp = case cp of
-    CommitPrecedentEmpty -> return $ Right $ M.empty
+    CommitPrecedentEmpty -> return $ Right $ TreeReadWrite M.empty
     CommitPrecedent ref  -> do
         mCommit <- getCommitMaybe git ref
-        case mCommit of
-            Nothing     -> return $ Left "commit not found"
-            Just commit -> do
-                htree <- buildHTree git =<< getTree git (commitTreeish commit)
-                return $ Right $ blobsMapFromHTree htree
+        return $ case mCommit of
+            Nothing     -> Left "commit not found"
+            Just commit -> Right $ TreeNotLoaded (commitTreeish commit)
     CommitPrecedentBranch refname -> do
         mCRef <- resolveRevision git $ Rev.fromString $ refNameRaw refname
         case mCRef of
@@ -150,7 +157,7 @@ commitPrecedentToBlobsMap git cp = case cp of
     CommitPrecedentDir dir -> do
         l <- listFilesFromDir dir
         l' <- mapM createRefFromFilePath l
-        return $ Right $ M.fromList l'
+        return $ Right $ TreeReadWrite $ M.fromList l'
   where
     listFilesFromDir :: FilePath -> IO [FilePath]
     listFilesFromDir fp = do
@@ -174,7 +181,7 @@ data Result a
 
 data CommitContext = CommitContext
     { commitContextGit       :: Git
-    , commitContextTree      :: BlobsMap
+    , commitContextTree      :: TreeStatus
     , commitContextAuthor    :: Person
     , commitContextCommitter :: Person
     , commitContextParents   :: [Ref]
@@ -183,7 +190,7 @@ data CommitContext = CommitContext
     , commitContextBranch    :: Maybe RefName
     }
 
-defaultCommitContext :: Git -> Person -> BlobsMap -> Maybe RefName -> [Ref] -> CommitContext
+defaultCommitContext :: Git -> Person -> TreeStatus -> Maybe RefName -> [Ref] -> CommitContext
 defaultCommitContext git p b mBranch parents = CommitContext
     { commitContextGit       = git
     , commitContextTree      = b
@@ -256,7 +263,10 @@ withNewCommit git person prec msg m = do
             case r of
                 ResultFailure err   -> return $ Left err
                 ResultSuccess ctx a -> do
-                    tree <- makeTrees git (commitContextTree ctx)
+                    tree <- case commitContextTree ctx of
+                                TreeNotLoaded ref   -> return ref
+                                TreeReadOnly  ref _ -> return ref
+                                TreeReadWrite bm    -> makeTrees git bm
                     let commit = Commit
                                     { commitTreeish   = tree
                                     , commitParents   = commitContextParents ctx
@@ -307,8 +317,31 @@ withContext f = CommitM $ \ctx -> do
 
 withContextBlobs :: (Git -> BlobsMap -> IO (BlobsMap, a)) -> CommitM a
 withContextBlobs f = withContext $ \ctx -> do
-    (bm, v) <- f (commitContextGit ctx) (commitContextTree ctx)
-    return (ctx { commitContextTree = bm }, v)
+    let git = commitContextGit ctx
+    bm <- case commitContextTree ctx of
+            TreeNotLoaded ref -> do
+                htree <- buildHTree git =<< getTree git ref
+                return $ blobsMapFromHTree htree
+            TreeReadOnly _ bm -> return bm
+            TreeReadWrite  bm -> return bm
+    (bm', v) <- f git bm
+    return (ctx {commitContextTree = TreeReadWrite bm' }, v)
+
+withContextBlobsReadOnly :: (Git -> BlobsMap -> IO a) -> CommitM a
+withContextBlobsReadOnly f = withContext $ \ctx -> do
+    let git = commitContextGit ctx
+    case commitContextTree ctx of
+        TreeNotLoaded ref -> do
+            htree <- buildHTree git =<< getTree git ref
+            let bm = blobsMapFromHTree htree
+            v <- f git bm
+            return (ctx {commitContextTree = TreeReadOnly ref bm }, v)
+        TreeReadOnly _ bm -> do
+            v <- f git bm
+            return (ctx, v)
+        TreeReadWrite bm -> do
+            v <- f git bm
+            return (ctx, v)
 
 -- | update the commit Author with the new given entry
 -- by default the author is the same as the committer (see withNewCommit)
@@ -348,12 +381,12 @@ setBranch p = withContext $ \ctx -> return $ (ctx { commitContextBranch = p }, (
 --
 -- return nothing if there is no file
 readFile :: FilePath -> CommitM (Maybe BL.ByteString)
-readFile fp = withContextBlobs $ \git bm -> do
+readFile fp = withContextBlobsReadOnly $ \git bm -> do
     case M.lookup fp bm of
-        Nothing  -> return (bm, Nothing)
+        Nothing  -> return Nothing
         Just ref -> do
             content <- getContent git fp ref
-            return (bm, Just content)
+            return $ Just content
 
 -- | write the given content in the given filepath
 --
@@ -379,7 +412,7 @@ deleteFile fp = withContextBlobs $ \_ bm -> return (M.delete fp bm, ())
 
 -- | list all the files present in this commit
 listFiles :: CommitM [FilePath]
-listFiles = withContextBlobs $ \_ bm -> return (bm, map fst $ M.toList bm)
+listFiles = withContextBlobsReadOnly $ \_ bm -> return $ map fst $ M.toList bm
 
 -------------------------------------------------------------------------------
 --                          Internal Hit Stuff                               --
