@@ -218,6 +218,17 @@ instance Monad CommitM where
     (>>=)  = bindCommitM
     fail   = failCommitM
 
+instance Alternative CommitM where
+    empty = fail "Atlternative.empty"
+    (<|>) = alternativeCommitM
+
+alternativeCommitM :: CommitM a -> CommitM a -> CommitM a
+alternativeCommitM m1 m2 = CommitM $ \ctx -> do
+    r <- runCommitM m1 ctx
+    case r of
+        ResultSuccess ctx' v -> return (ResultSuccess ctx' v)
+        ResultFailure _      -> runCommitM m2 ctx
+
 fmapCommitM :: (a -> b) -> CommitM a -> CommitM b
 fmapCommitM f m = CommitM $ \ctx -> do
     r <- runCommitM m ctx
