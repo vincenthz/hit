@@ -52,6 +52,7 @@ Library
                    , utf8-string
                    , patience
   Exposed-modules:   Data.Git
+                     Data.Git.FS
                      Data.Git.Types
                      Data.Git.Storage
                      Data.Git.Storage.PackIndex
