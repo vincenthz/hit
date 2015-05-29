@@ -30,6 +30,7 @@ import Control.Applicative ((<$>))
 
 import qualified Filesystem as F
 import qualified Filesystem.Path.Rules as FP (posix, decode, encode, encodeString, decodeString)
+import qualified Filesystem.Path.CurrentOS as FP (parent)
 import Filesystem.Path.CurrentOS hiding (root)
 
 import Data.String
@@ -179,7 +180,9 @@ existsRefFile :: FilePath -> RefSpecTy -> IO Bool
 existsRefFile gitRepo specty = F.isFile $ toPath gitRepo specty
 
 writeRefFile :: FilePath -> RefSpecTy -> RefContentTy -> IO ()
-writeRefFile gitRepo specty refcont = F.writeFile filepath $ fromRefContent refcont
+writeRefFile gitRepo specty refcont = do
+    F.createTree $ FP.parent filepath
+    F.writeFile filepath $ fromRefContent refcont
     where filepath = toPath gitRepo specty
           fromRefContent (RefLink link)        = B.concat ["ref: ", pathEncode $ FP.decodeString FP.posix $ fromRefTy link, B.singleton 0xa]
           fromRefContent (RefDirect ref)       = B.concat [toHex ref, B.singleton 0xa]
