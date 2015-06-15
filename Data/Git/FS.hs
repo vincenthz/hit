@@ -59,17 +59,25 @@ module Data.Git.FS
 
       -- * Commit
     , CommitM
+    , withCommit
     , withNewCommit
     , withNewCommit_
     , CommitPrecedent(..)
 
       -- ** Operations
     , setAuthor
+    , getAuthor
     , setCommitter
+    , getCommitter
     , setParents
+    , getParents
     , setEncoding
+    , getEncoding
     , setExtras
+    , getExtras
     , setBranch
+    , getMessage
+    , getRef
     , readFile
     , writeFile
     , appendFile
@@ -181,6 +189,7 @@ data Result a
 
 data CommitContext = CommitContext
     { commitContextGit       :: Git
+    , commitContextRef       :: Maybe Ref
     , commitContextTree      :: TreeStatus
     , commitContextAuthor    :: Person
     , commitContextCommitter :: Person
@@ -188,11 +197,13 @@ data CommitContext = CommitContext
     , commitContextExtras    :: [CommitExtra]
     , commitContextEncoding  :: Maybe ByteString
     , commitContextBranch    :: Maybe RefName
+    , commitContextMessage   :: ByteString
     }
 
-defaultCommitContext :: Git -> Person -> TreeStatus -> Maybe RefName -> [Ref] -> CommitContext
-defaultCommitContext git p b mBranch parents = CommitContext
+defaultCommitContext :: Git -> Maybe Ref -> Person -> TreeStatus -> Maybe RefName -> [Ref] -> CommitContext
+defaultCommitContext git mRef p b mBranch parents = CommitContext
     { commitContextGit       = git
+    , commitContextRef       = mRef
     , commitContextTree      = b
     , commitContextAuthor    = p
     , commitContextCommitter = p
@@ -200,6 +211,7 @@ defaultCommitContext git p b mBranch parents = CommitContext
     , commitContextExtras    = []
     , commitContextEncoding  = Nothing
     , commitContextBranch    = mBranch
+    , commitContextMessage   = ""
     }
 
 newtype CommitM a = CommitM
@@ -252,6 +264,50 @@ bindCommitM m fm = CommitM $ \ctx -> do
 failCommitM :: String -> CommitM a
 failCommitM msg = CommitM $ \_ -> return $ ResultFailure msg
 
+-- | this function allows user to view a git commit in its context
+-- (i.e. accessing the git commit in a ReadOnly mode: commit message,
+-- authors, files...)
+withCommit :: Git
+           -> CommitPrecedent
+           -> CommitM a
+           -> IO (Either String a)
+withCommit git prec m = do
+    mRef <- defaultParents
+    case mRef of
+        Nothing  -> return $ Left "cannot load the given commit"
+        Just ref -> do
+            mCommit <- getCommitMaybe git ref
+            case mCommit of
+                Nothing -> return $ Left "cannot load the given commit"
+                Just commit -> do
+                    let ctx = CommitContext
+                                { commitContextGit       = git
+                                , commitContextRef       = mRef
+                                , commitContextTree      = TreeNotLoaded (commitTreeish commit)
+                                , commitContextAuthor    = commitAuthor commit
+                                , commitContextCommitter = commitCommitter commit
+                                , commitContextParents   = commitParents commit
+                                , commitContextExtras    = commitExtras commit
+                                , commitContextEncoding  = commitEncoding commit
+                                , commitContextBranch    = mBranch
+                                , commitContextMessage   = commitMessage commit
+                                }
+                    r <- runCommitM m ctx
+                    return $ case r of
+                        ResultFailure err   -> Left err
+                        ResultSuccess _   a -> Right a
+  where
+    mBranch :: Maybe RefName
+    mBranch = case prec of
+        CommitPrecedentBranch ref -> Just ref
+        _                         -> Nothing
+    defaultParents :: IO (Maybe Ref)
+    defaultParents = case prec of
+        CommitPrecedent ref -> return $ Just ref
+        CommitPrecedentBranch refname -> do
+            resolveRevision git $ Rev.fromString $ refNameRaw refname
+        _ -> return Nothing
+
 -- | this function creates a new commit with the given information
 withNewCommit :: Git
                     -- ^ the git to use to create/manipulate the new commit in
@@ -270,7 +326,7 @@ withNewCommit git person prec msg m = do
         Left err -> return $ Left $ "cannot initialized Commit context: " ++ err
         Right b  -> do
             parents <- defaultParents
-            r <- runCommitM m (defaultCommitContext git person b mBranch parents)
+            r <- runCommitM m (defaultCommitContext git Nothing person b mBranch parents)
             case r of
                 ResultFailure err   -> return $ Left err
                 ResultSuccess ctx a -> do
@@ -359,10 +415,18 @@ withContextBlobsReadOnly f = withContext $ \ctx -> do
 setAuthor :: Person -> CommitM ()
 setAuthor p = withContext $ \ctx -> return $ (ctx { commitContextAuthor = p }, ())
 
+-- | get the Author of the actual commit
+getAuthor :: CommitM Person
+getAuthor = withContext $ \ctx -> return (ctx, commitContextAuthor ctx)
+
 -- | update the commit Committer with the new given entry
 -- by default the committer is the same as the author (see withNewCommit)
 setCommitter :: Person -> CommitM ()
 setCommitter p = withContext $ \ctx -> return $ (ctx { commitContextCommitter = p }, ())
+
+-- | get the Committer of the actual commit
+getCommitter :: CommitM Person
+getCommitter = withContext $ \ctx -> return (ctx, commitContextCommitter ctx)
 
 -- | set the Parents of the commit (by default the list is empty -- the commit
 -- has no parents)
@@ -371,15 +435,25 @@ setCommitter p = withContext $ \ctx -> return $ (ctx { commitContextCommitter = 
 setParents :: [Ref] -> CommitM ()
 setParents lParents = withContext $ \ctx -> return $ (ctx { commitContextParents = lParents }, ())
 
+-- | get the parents's ref of the actual commit
+getParents :: CommitM [Ref]
+getParents = withContext $ \ctx -> return (ctx, commitContextParents ctx)
+
 -- | set extras information to the commit (by default this list is empty)
 --
 -- this function erases the existing extras
 setExtras :: [CommitExtra] -> CommitM ()
 setExtras p = withContext $ \ctx -> return $ (ctx { commitContextExtras = p }, ())
 
+getExtras :: CommitM [CommitExtra]
+getExtras = withContext $ \ctx -> return (ctx, commitContextExtras ctx)
+
 -- | set the encoding (by default this value is Nothing)
 setEncoding :: Maybe ByteString -> CommitM ()
 setEncoding p = withContext $ \ctx -> return $ (ctx { commitContextEncoding = p }, ())
+
+getEncoding :: CommitM (Maybe ByteString)
+getEncoding = withContext $ \ctx -> return (ctx, commitContextEncoding ctx)
 
 -- | set the Branch (by default this value is Nothing)
 --
@@ -387,6 +461,13 @@ setEncoding p = withContext $ \ctx -> return $ (ctx { commitContextEncoding = p 
 -- the new commit reference.
 setBranch :: Maybe RefName -> CommitM ()
 setBranch p = withContext $ \ctx -> return $ (ctx { commitContextBranch = p }, ())
+
+-- | get the commit's message
+getMessage :: CommitM ByteString
+getMessage = withContext $ \ctx -> return (ctx, commitContextMessage ctx)
+
+getRef :: CommitM (Maybe Ref)
+getRef = withContext $ \ctx -> return (ctx, commitContextRef ctx)
 
 -- | read the content of the given file
 --
