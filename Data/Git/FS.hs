@@ -51,7 +51,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Data.Git.FS
+module Data.Git.FS {-# DEPRECATED "Data.Git.Monad instead" #-}
     ( -- * Repo
       Git
     , withRepo

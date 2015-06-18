@@ -19,6 +19,8 @@ import Data.Maybe
 import Text.Bytedump
 import System.Exit
 
+import Monad
+
 onLocalRepo f = do
     fpath <- findRepoMaybe
     case fpath of
@@ -54,6 +56,8 @@ printLocalMarshallError l
                >> mapM_ printDiff l
                >> exitFailure
 
-main = onLocalRepo $ \git -> do
-    doLocalMarshallEq git >>= printLocalMarshallError . catMaybes . concat
-    return ()
+main = do
+    onLocalRepo $ \git -> do
+        doLocalMarshallEq git >>= printLocalMarshallError . catMaybes . concat
+        return ()
+    testGitMonadLocal
