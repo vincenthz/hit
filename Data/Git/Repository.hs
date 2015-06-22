@@ -101,7 +101,7 @@ getTree git ref = maybe err id . objectToTree <$> getObject_ git ref True
 -- for example: HEAD, HEAD^, master~3, shortRef
 resolveRevision :: Git -> Revision -> IO (Maybe Ref)
 resolveRevision git (Revision prefix modifiers) =
-    getCacheVal (packedNamed git) >>= \c -> resolvePrefix c >>= modf modifiers
+    getCacheVal (packedNamed git) >>= \c -> resolvePrefix c >>= maybe (return Nothing) (modf modifiers)
   where
         resolvePrefix lookupCache = tryResolvers
               [resolveNamedPrefix lookupCache namedResolvers
@@ -131,19 +131,23 @@ resolveRevision git (Revision prefix modifiers) =
                              "FETCH_HEAD" -> [ RefFetchHead ]
                              _            -> map (flip ($) (RefName prefix)) [RefTag,RefBranch,RefRemote]
 
-        tryResolvers :: [IO (Maybe Ref)] -> IO Ref
-        tryResolvers []            = return $ fromHexString prefix
+        tryResolvers :: [IO (Maybe Ref)] -> IO (Maybe Ref)
+        tryResolvers []            = return $ if (isHexString prefix)
+            then Just $ fromHexString prefix
+            else Nothing
         tryResolvers (resolver:xs) = resolver >>= isResolved
-           where isResolved (Just r) = return r
+           where isResolved (Just r) = return (Just r)
                  isResolved Nothing  = tryResolvers xs
 
         resolvePrePrefix :: IO (Maybe Ref)
-        resolvePrePrefix = do
-            refs <- findReferencesWithPrefix git prefix
-            case refs of
-                []  -> return Nothing
-                [r] -> return (Just r)
-                _   -> error "multiple references with this prefix"
+        resolvePrePrefix
+            | not (isHexString prefix) = return Nothing
+            | otherwise = do
+                refs <- findReferencesWithPrefix git prefix
+                case refs of
+                    []  -> return Nothing
+                    [r] -> return (Just r)
+                    _   -> error "multiple references with this prefix"
 
         modf [] ref                  = return (Just ref)
         modf (RevModParent i:xs) ref = do

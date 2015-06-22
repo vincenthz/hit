@@ -53,6 +53,7 @@ Library
                    , patience
   Exposed-modules:   Data.Git
                      Data.Git.FS
+                     Data.Git.Monad
                      Data.Git.Types
                      Data.Git.Storage
                      Data.Git.Storage.PackIndex
