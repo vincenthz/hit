@@ -297,7 +297,7 @@ data CommitAccessContext = CommitAccessContext
 
 -- | ReadOnly operations on a given commit
 newtype CommitAccessM  a = CommitAccessM
-    { runCommitAccessM :: GitMonad git => CommitAccessContext -> git (Result CommitAccessContext a)
+    { runCommitAccessM :: forall git . GitMonad git => CommitAccessContext -> git (Result CommitAccessContext a)
     }
 
 instance Functor CommitAccessM where
@@ -458,7 +458,7 @@ data CommitContext = CommitContext
     }
 
 newtype CommitM  a = CommitM
-    { runCommitM :: GitMonad git => CommitContext -> git (Result CommitContext a)
+    { runCommitM :: forall git . GitMonad git => CommitContext -> git (Result CommitContext a)
     }
 
 instance Functor CommitM where
