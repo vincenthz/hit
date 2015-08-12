@@ -39,8 +39,6 @@ module Data.Git.Repository
     , headGet
     ) where
 
-import Control.Applicative ((<$>))
-import Control.Monad
 import Control.Exception (Exception, throw)
 
 import Data.Maybe (fromMaybe)
@@ -50,6 +48,7 @@ import Data.IORef
 
 import Data.Git.Named
 import Data.Git.Types
+import Data.Git.Imports
 import Data.Git.Storage.Object
 import Data.Git.Storage
 import Data.Git.Revision

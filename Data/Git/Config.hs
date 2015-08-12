@@ -19,9 +19,8 @@ module Data.Git.Config
     , get
     ) where
 
-import Control.Applicative
-import Control.Monad (mplus)
 import Data.Git.Path
+import Data.Git.Imports
 import Data.List (find)
 import Filesystem.Path.CurrentOS
 import Filesystem (getHomeDirectory)

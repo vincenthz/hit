@@ -25,11 +25,9 @@ module Data.Git.Storage.Pack
         , packObjectFromRaw
         ) where
 
-import Control.Applicative ((<$>))
 import Control.Arrow (second)
-import Control.Monad
 
-import Filesystem.Path.Rules
+import qualified Filesystem.Path.Rules as Rules
 import Filesystem.Path
 import Filesystem
 
@@ -42,6 +40,7 @@ import qualified Data.Attoparsec as A
 import qualified Data.Attoparsec.Lazy as AL
 
 import Data.Git.Internal
+import Data.Git.Imports
 import Data.Git.Path
 import Data.Git.Storage.Object
 import Data.Git.Delta
@@ -63,7 +62,7 @@ data PackedObjectInfo = PackedObjectInfo
         } deriving (Show,Eq)
 
 -- | Enumerate the pack refs available in this repository.
-packEnumerate repoPath = map onlyHash . filter isPackFile . map (encodeString posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
+packEnumerate repoPath = map onlyHash . filter isPackFile . map (Rules.encodeString Rules.posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
   where
         isPackFile :: String -> Bool
         isPackFile x = ".pack" `isSuffixOf` x

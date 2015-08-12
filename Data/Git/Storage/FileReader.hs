@@ -24,9 +24,7 @@ module Data.Git.Storage.FileReader
         ) where
 
 
-import Control.Applicative ((<$>))
 import Control.Exception (bracket, throwIO)
-import Control.Monad
 
 import Data.Attoparsec (parseWith, Parser, IResult(..))
 import qualified Data.Attoparsec as A
@@ -38,6 +36,8 @@ import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Lazy.Internal (defaultChunkSize)
 import Data.IORef
 
+import Data.Git.Imports
+
 import Data.Data
 import Data.Word
 
@@ -48,7 +48,6 @@ import qualified Control.Exception as E
 
 import System.IO (hClose, hSeek, SeekMode(..))
 import Filesystem
-import Filesystem.Path
 import Prelude hiding (FilePath)
 
 data FileReader = FileReader

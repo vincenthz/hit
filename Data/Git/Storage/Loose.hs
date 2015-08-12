@@ -33,12 +33,13 @@ import Codec.Compression.Zlib
 import Data.Git.Ref
 import Data.Git.Path
 import Data.Git.Internal
+import Data.Git.Imports
 import Data.Git.Storage.FileWriter
 import Data.Git.Storage.Object
 
 import Filesystem
 import Filesystem.Path
-import Filesystem.Path.Rules
+import qualified Filesystem.Path.Rules as Rules
 
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as L
@@ -46,8 +47,6 @@ import qualified Data.ByteString as B
 
 import Data.Attoparsec.Lazy
 import qualified Data.Attoparsec.Char8 as PC
-import Control.Applicative ((<$>), (<|>))
-import Control.Monad
 import Control.Exception (onException, SomeException)
 import qualified Control.Exception as E
 
@@ -176,4 +175,4 @@ looseWrite repoPath obj = createDirectory True (directory path)
                 ref     = hashLBS content
                 writeFileLazy p bs = withFile p WriteMode (\h -> L.hPut h bs)
 
-getDirectoryContents p = map (encodeString posix . filename) <$> listDirectory p
+getDirectoryContents p = map (Rules.encodeString Rules.posix . filename) <$> listDirectory p

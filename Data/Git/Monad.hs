@@ -74,7 +74,6 @@ module Data.Git.Monad
     , Git.Person(..)
     ) where
 
-import Control.Applicative
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -83,6 +82,7 @@ import qualified Data.Git as Git
 import qualified Data.Git.Revision as Git
 import qualified Data.Git.Repository as Git
 import qualified Data.Git.Storage.Object as Git
+import           Data.Git.Imports
 
 import qualified Filesystem.Path as FP
 

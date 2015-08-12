@@ -41,7 +41,6 @@ module Data.Git.Types
 import Data.Word
 import Data.Bits
 import Data.Byteable
-import Data.Monoid
 import Data.String
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B

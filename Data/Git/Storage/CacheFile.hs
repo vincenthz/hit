@@ -8,14 +8,12 @@
 --
 module Data.Git.Storage.CacheFile (CacheFile, newCacheVal, getCacheVal) where
 
-import Control.Applicative ((<$>))
 import Control.Concurrent.MVar
 import qualified Control.Exception as E
-import Filesystem.Path
-import Filesystem.Path.CurrentOS (encodeString)
 import Prelude hiding (FilePath)
 import System.PosixCompat.Files (getFileStatus, modificationTime)
 import System.PosixCompat.Types (EpochTime)
+import           Data.Git.Imports
 
 data CacheFile a = CacheFile
     { cacheFilepath :: FilePath
