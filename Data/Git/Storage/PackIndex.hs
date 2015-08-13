@@ -25,12 +25,9 @@ module Data.Git.Storage.PackIndex
         , packIndexGetHeader
         ) where
 
-import Control.Applicative ((<$>))
-import Control.Monad
-
 import Filesystem
 import Filesystem.Path
-import Filesystem.Path.Rules
+import qualified Filesystem.Path.Rules as Rules
 
 import Data.List
 import Data.Bits
@@ -43,6 +40,7 @@ import qualified Data.Vector as V
 import qualified Data.Attoparsec as A
 
 import Data.Git.Internal
+import Data.Git.Imports
 import Data.Git.Storage.FileReader
 import Data.Git.Path
 import Data.Git.Ref
@@ -62,7 +60,7 @@ data PackIndex = PackIndex
         }
 
 -- | enumerate every indexes file in the pack directory
-packIndexEnumerate repoPath = map onlyHash . filter isPackFile . map (encodeString posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
+packIndexEnumerate repoPath = map onlyHash . filter isPackFile . map (Rules.encodeString Rules.posix . filename) <$> listDirectory (repoPath </> "objects" </> "pack")
   where
         isPackFile :: String -> Bool
         isPackFile x = ".idx" `isSuffixOf` x && "pack-" `isPrefixOf` x

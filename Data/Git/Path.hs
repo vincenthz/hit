@@ -10,8 +10,8 @@ module Data.Git.Path where
 
 import Filesystem.Path.CurrentOS
 import System.Random
-import Control.Applicative ((<$>))
 import Data.Git.Ref
+import Data.Git.Imports
 import Data.String
 
 configPath gitRepo = gitRepo </> "config"

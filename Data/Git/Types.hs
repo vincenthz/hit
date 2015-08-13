@@ -48,6 +48,7 @@ import qualified Data.ByteString.Lazy as L
 
 import Data.Git.Ref
 import Data.Git.Delta
+import Data.Git.Imports
 import Data.Hourglass (Elapsed, TimezoneOffset(..)
                       , timePrint, timeConvert
                       , Time(..), Timeable(..)
