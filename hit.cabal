@@ -73,6 +73,7 @@ Library
                      Data.Git.Storage.FileWriter
                      Data.Git.Storage.CacheFile
                      Data.Git.Path
+                     Data.Git.Parser
                      Data.Git.WorkTree
   ghc-options:       -Wall -fno-warn-missing-signatures
 

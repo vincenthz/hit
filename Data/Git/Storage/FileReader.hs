@@ -26,9 +26,6 @@ module Data.Git.Storage.FileReader
 
 import Control.Exception (bracket, throwIO)
 
-import Data.Attoparsec (parseWith, Parser, IResult(..))
-import qualified Data.Attoparsec as A
-import Data.Bits
 import Data.ByteString (ByteString)
 import Data.ByteString.Unsafe
 import qualified Data.ByteString as B
@@ -37,6 +34,7 @@ import Data.ByteString.Lazy.Internal (defaultChunkSize)
 import Data.IORef
 
 import Data.Git.Imports
+import qualified Data.Git.Parser as P
 
 import Data.Data
 import Data.Word
@@ -129,21 +127,18 @@ fileReaderSeek (FileReader { fbHandle = handle, fbRemaining = ref, fbPos = pos }
         writeIORef ref B.empty >> writeIORef pos absPos >> hSeek handle AbsoluteSeek (fromIntegral absPos)
 
 -- | parse from a filebuffer
-fileReaderParse :: FileReader -> Parser a -> IO a
+fileReaderParse :: FileReader -> P.Parser a -> IO a
 fileReaderParse fr@(FileReader { fbRemaining = ref }) parseF = do
         initBS <- readIORef ref
-        result <- parseWith (fileReaderGetNext fr) parseF initBS
+        result <- P.parseWith (fileReaderGetNext fr) parseF initBS
         case result of
-                Done remaining a -> writeIORef ref remaining >> return a
-                Partial _        -> error "parsing failed: partial with a handle, reached EOF ?"
-                Fail _ ctxs err  -> error ("parsing failed: " ++ show ctxs ++ " : " ++ show err)
+                P.Done remaining a -> writeIORef ref remaining >> return a
+                P.Partial _        -> error "parsing failed: partial with a handle, reached EOF ?"
+                P.Fail _ ctxs err  -> error ("parsing failed: " ++ show ctxs ++ " : " ++ show err)
 
 -- | get a Variable Length Field. get byte as long as MSB is set, and one byte after
 fileReaderGetVLF :: FileReader -> IO [Word8]
-fileReaderGetVLF fr = fileReaderParse fr $ do
-        bs <- A.takeWhile (\w -> w `testBit` 7)
-        l  <- A.anyWord8
-        return $ (map (\w -> w `clearBit` 7) $ B.unpack bs) ++ [l]
+fileReaderGetVLF fr = fileReaderParse fr P.vlf
 
 fileReaderInflateToSize :: FileReader -> Word64 -> IO L.ByteString
 fileReaderInflateToSize fb@(FileReader { fbRemaining = ref }) outputSize = do

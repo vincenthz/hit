@@ -13,16 +13,13 @@ module Data.Git.Delta
     , deltaApply
     ) where
 
-import Data.Attoparsec
-import qualified Data.Attoparsec as A
-import qualified Data.Attoparsec.Lazy as AL
+import Control.Applicative (many)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Data.Bits
 import Data.Word
 
-import Control.Applicative ((<$>), many)
+import qualified Data.Git.Parser as P
 
 -- | a delta is a source size, a destination size and a list of delta cmd
 data Delta = Delta Word64 Word64 [DeltaCmd]
@@ -42,13 +39,10 @@ data DeltaCmd =
 deltaParse = do
     srcSize <- getDeltaHdrSize
     resSize <- getDeltaHdrSize
-    dcmds   <- many (anyWord8 >>= parseWithCmd)
+    dcmds   <- many (P.anyWord8 >>= parseWithCmd)
     return $ Delta srcSize resSize dcmds
   where
-        getDeltaHdrSize = do
-            z <- A.takeWhile (\w -> w `testBit` 7)
-            l <- anyWord8
-            return $ unbytes 0 $ (map (\w -> w `clearBit` 7) (B.unpack z) ++ [l])
+        getDeltaHdrSize = unbytes 0 <$> P.vlf
         -- use a foldl ..
         unbytes _  []     = 0
         unbytes sh (x:xs) = (fromIntegral x) `shiftL` sh + unbytes (sh+7) xs
@@ -66,12 +60,12 @@ deltaParse = do
                 let offset = o1 .|. o2 .|. o3 .|. o4
                 let size   = s1 .|. s2 .|. s3
                 return $ DeltaSrc offset (if size == 0 then 0x10000 else size)
-            | otherwise       = DeltaCopy <$> A.take (fromIntegral cmd)
+            | otherwise       = DeltaCopy <$> P.takeBytes (fromIntegral cmd)
         word8cond cond sh =
-            if cond then (flip shiftL sh . fromIntegral) <$> anyWord8 else return 0
+            if cond then (flip shiftL sh . fromIntegral) <$> P.anyWord8 else return 0
 
 -- | read one delta from a lazy bytestring.
-deltaRead = AL.maybeResult . AL.parse deltaParse
+deltaRead = P.maybeParseChunks deltaParse
 
 -- | apply a delta on a lazy bytestring, returning a new bytestring.
 deltaApply :: L.ByteString -> Delta -> L.ByteString

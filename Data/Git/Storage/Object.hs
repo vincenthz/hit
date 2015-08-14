@@ -43,6 +43,7 @@ module Data.Git.Storage.Object
 import Data.Git.Ref
 import Data.Git.Types
 import Data.Git.Imports
+import qualified Data.Git.Parser as P
 
 import Data.Byteable (toBytes)
 import Data.ByteString (ByteString)
@@ -51,7 +52,6 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as L
 
 import Data.Attoparsec.Lazy
-import qualified Data.Attoparsec.Lazy as P
 import qualified Data.Attoparsec.Char8 as PC
 
 import Data.List (intersperse)
@@ -126,7 +126,7 @@ objectTypeMarshall TypeCommit = "commit"
 objectTypeMarshall TypeTag    = "tag"
 objectTypeMarshall _          = error "deltas cannot be marshalled"
 
-objectTypeUnmarshall :: String -> ObjectType
+objectTypeUnmarshall :: ByteString -> ObjectType
 objectTypeUnmarshall "tree"   = TypeTree
 objectTypeUnmarshall "blob"   = TypeBlob
 objectTypeUnmarshall "commit" = TypeCommit
@@ -175,13 +175,10 @@ skipEOL = skipChar '\n'
 skipChar :: Char -> Parser ()
 skipChar c = PC.char c >> return ()
 
-referenceHex = fromHex <$> P.take 40
-referenceBin = fromBinary <$> P.take 20
-
 -- | parse a tree content
 treeParse = Tree <$> parseEnts
     where parseEnts = atEnd >>= \end -> if end then return [] else liftM2 (:) parseEnt parseEnts
-          parseEnt = liftM3 (,,) modeperm parseEntName (word8 0 >> referenceBin)
+          parseEnt = liftM3 (,,) modeperm parseEntName (word8 0 >> P.referenceBin)
           parseEntName = entName <$> (PC.char ' ' >> takeTill ((==) 0))
 
 -- | parse a blob content
@@ -189,38 +186,38 @@ blobParse = (Blob <$> takeLazyByteString)
 
 -- | parse a commit content
 commitParse = do
-        tree <- string "tree " >> referenceHex
+        tree <- P.string "tree " >> P.referenceHex
         skipChar '\n'
         parents   <- many parseParentRef
-        author    <- string "author " >> parsePerson
-        committer <- string "committer " >> parsePerson
-        encoding  <- option Nothing $ Just <$> (string "encoding " >> tillEOL)
+        author    <- P.string "author " >> parsePerson
+        committer <- P.string "committer " >> parsePerson
+        encoding  <- option Nothing $ Just <$> (PC.string "encoding " >> tillEOL)
         extras    <- many parseExtra
         skipChar '\n'
         message <- takeByteString
         return $ Commit tree parents author committer encoding extras message
         where
                 parseParentRef = do
-                        tree <- string "parent " >> referenceHex
+                        tree <- P.string "parent " >> P.referenceHex
                         skipChar '\n'
                         return tree
                 parseExtra = do
-                        f <- B.pack . (:[]) <$> notWord8 0xa
+                        f <- B.singleton <$> notWord8 0xa
                         r <- tillEOL
                         skipEOL
-                        v <- concatLines <$> many (string " " *> tillEOL <* skipEOL)
+                        v <- concatLines <$> many (P.string " " *> tillEOL <* skipEOL)
                         return $ CommitExtra (f `B.append` r) v
                 concatLines = B.concat . intersperse (B.pack [0xa])
 
 -- | parse a tag content
 tagParse = do
-        object <- string "object " >> referenceHex
+        object <- P.string "object " >> P.referenceHex
         skipChar '\n'
-        type_ <- objectTypeUnmarshall . BC.unpack <$> (string "type " >> takeTill ((==) 0x0a))
+        type_ <- objectTypeUnmarshall <$> (P.string "type " >> takeTill ((==) 0x0a))
         skipChar '\n'
-        tag   <- string "tag " >> takeTill ((==) 0x0a)
+        tag   <- P.string "tag " >> takeTill ((==) 0x0a)
         skipChar '\n'
-        tagger <- string "tagger " >> parsePerson
+        tagger <- P.string "tagger " >> parsePerson
         skipChar '\n'
         signature <- takeByteString
         return $ Tag object type_ tag tagger signature
@@ -229,9 +226,9 @@ parsePerson = do
         name <- B.init <$> PC.takeWhile ((/=) '<')
         skipChar '<'
         email <- PC.takeWhile ((/=) '>')
-        _ <- string "> "
+        _ <- P.string "> "
         time <- PC.decimal :: Parser Integer
-        _ <- string " "
+        _ <- P.string " "
         timezoneFmt  <- PC.signed PC.decimal
         let timezoneSign = if timezoneFmt < 0 then negate else id
         let (h,m)    = abs timezoneFmt `divMod` 100

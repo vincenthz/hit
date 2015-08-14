@@ -37,13 +37,12 @@ import Data.String
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as V
 
-import qualified Data.Attoparsec as A
-
 import Data.Git.Internal
 import Data.Git.Imports
 import Data.Git.Storage.FileReader
 import Data.Git.Path
 import Data.Git.Ref
+import qualified Data.Git.Parser as P
 
 import Prelude hiding (FilePath)
 
@@ -151,11 +150,11 @@ packIndexOffsets idx = (packIndexSha1sOffset, packIndexCRCsOffset, packIndexPack
 
 -- | parse index header
 parsePackIndexHeader = do
-        magic   <- be32 <$> A.take 4
+        magic   <- P.word32
         when (magic /= 0xff744f63) $ error "wrong magic number for packIndex"
-        ver     <- be32 <$> A.take 4
+        ver     <- P.word32
         when (ver /= 2) $ error "unsupported packIndex version"
-        fanouts <- V.replicateM 256 (be32 <$> A.take 4)
+        fanouts <- V.replicateM 256 P.word32
         return $ PackIndexHeader ver fanouts
 
 -- | read index header from an index filereader
@@ -172,13 +171,13 @@ packIndexRead repoPath indexRef = do
                 idx <- fileReaderParse fr parsePackIndexHeader
                 liftM2 (,) (return idx) (fileReaderParse fr (parsePackIndex $ packIndexHeaderGetSize idx))
         where parsePackIndex sz = do
-                sha1s     <- V.replicateM (fromIntegral sz) (fromBinary <$> A.take 20)
-                crcs      <- V.replicateM (fromIntegral sz) (be32 <$> A.take 4)
-                packoffs  <- V.replicateM (fromIntegral sz) (be32 <$> A.take 4)
+                sha1s     <- V.replicateM (fromIntegral sz) P.referenceBin
+                crcs      <- V.replicateM (fromIntegral sz) P.word32
+                packoffs  <- V.replicateM (fromIntegral sz) P.word32
                 let nbLarge = length $ filter (== True) $ map (\packoff -> packoff `testBit` 31) $ V.toList packoffs
-                largeoffs <- replicateM nbLarge (A.take 4)
-                packfileChecksum <- fromBinary <$> A.take 20
-                idxfileChecksum  <- fromBinary <$> A.take 20
+                largeoffs <- replicateM nbLarge (P.takeBytes 4)
+                packfileChecksum <- P.referenceBin
+                idxfileChecksum  <- P.referenceBin
                 -- large packfile offsets
                 -- trailer
                 return (sha1s, crcs, packoffs, largeoffs, packfileChecksum, idxfileChecksum)

@@ -35,10 +35,7 @@ import Data.Bits
 import Data.List
 import qualified Data.ByteString.Lazy as L
 
-import Data.Attoparsec (anyWord8)
-import qualified Data.Attoparsec as A
-import qualified Data.Attoparsec.Lazy as AL
-
+import qualified Data.Git.Parser as P
 import Data.Git.Internal
 import Data.Git.Imports
 import Data.Git.Path
@@ -82,11 +79,11 @@ packReadHeader repoPath packRef =
         withFileReader (packPath repoPath packRef) $ \filereader ->
                 fileReaderParse filereader parseHeader
         where parseHeader = do
-                packMagic <- be32 <$> A.take 4
+                packMagic <- P.word32
                 when (packMagic /= 0x5041434b) $ error "not a git packfile"
-                ver <- be32 <$> A.take 4
+                ver <- P.word32
                 when (ver /= 2) $ error ("pack file version not supported: " ++ show ver)
-                be32 <$> A.take 4
+                P.word32
 
 -- | read an object at a specific position using a map function on the objectData
 packReadMapAtOffset fr offset mapData = fileReaderSeek fr offset >> getNextObject fr mapData
@@ -116,17 +113,17 @@ getNextObject fr mapData =
 packedObjectToObject (PackedObjectInfo { poiType = ty, poiExtra = extra }, objData) =
         packObjectFromRaw (ty, extra, objData)
 
-packObjectFromRaw (TypeCommit, Nothing, objData) = AL.maybeResult $ AL.parse objectParseCommit objData
-packObjectFromRaw (TypeTree, Nothing, objData)   = AL.maybeResult $ AL.parse objectParseTree objData
-packObjectFromRaw (TypeBlob, Nothing, objData)   = AL.maybeResult $ AL.parse objectParseBlob objData
-packObjectFromRaw (TypeTag, Nothing, objData)    = AL.maybeResult $ AL.parse objectParseTag objData
+packObjectFromRaw (TypeCommit, Nothing, objData) = P.maybeParseChunks objectParseCommit objData
+packObjectFromRaw (TypeTree, Nothing, objData)   = P.maybeParseChunks objectParseTree objData
+packObjectFromRaw (TypeBlob, Nothing, objData)   = P.maybeParseChunks objectParseBlob objData
+packObjectFromRaw (TypeTag, Nothing, objData)    = P.maybeParseChunks objectParseTag objData
 packObjectFromRaw (TypeDeltaOff, Just (PtrOfs o), objData) = toObject . DeltaOfs o <$> deltaRead objData
 packObjectFromRaw (TypeDeltaRef, Just (PtrRef r), objData) = toObject . DeltaRef r <$> deltaRead objData
 packObjectFromRaw _                              = error "can't happen unless someone change getNextObjectRaw"
 
 getNextObjectRaw :: FileReader -> IO PackedObjectRaw
 getNextObjectRaw fr = do
-        sobj      <- fileReaderGetPos fr
+        sobj       <- fileReaderGetPos fr
         (ty, size) <- fileReaderParse fr parseObjectHeader
         extra      <- case ty of
                 TypeDeltaRef -> Just . PtrRef . fromBinary <$> fileReaderGetBS 20 fr
@@ -138,12 +135,12 @@ getNextObjectRaw fr = do
         return (PackedObjectInfo ty sobj (eobj - sobj) size extra, objData)
         where
                 parseObjectHeader = do
-                        (m, ty, sz) <- splitFirst <$> anyWord8
+                        (m, ty, sz) <- splitFirst <$> P.anyWord8
                         size <- if m then (sz +) <$> getNextSize 4 else return sz
                         return (ty, size)
                         where
                                 getNextSize n = do
-                                        (c, sz) <- splitOther n <$> anyWord8
+                                        (c, sz) <- splitOther n <$> P.anyWord8
                                         if c then (sz +) <$> getNextSize (n+7) else return sz
 
                                 splitFirst :: Word8 -> (Bool, ObjectType, Word64)

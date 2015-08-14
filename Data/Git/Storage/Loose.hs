@@ -36,6 +36,7 @@ import Data.Git.Internal
 import Data.Git.Imports
 import Data.Git.Storage.FileWriter
 import Data.Git.Storage.Object
+import qualified Data.Git.Parser as P
 
 import Filesystem
 import Filesystem.Path
@@ -46,7 +47,6 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
 
 import Data.Attoparsec.Lazy
-import qualified Data.Attoparsec.Char8 as PC
 import Control.Exception (onException, SomeException)
 import qualified Control.Exception as E
 
@@ -58,20 +58,17 @@ import Prelude hiding (FilePath)
 isObjectPrefix [a,b] = isHexDigit a && isHexDigit b
 isObjectPrefix _     = False
 
-decimal :: Parser Int
-decimal = PC.decimal
-
 -- loose object parsing
 parseHeader = do
         h <- takeWhile1 ((/=) 0x20)
         _ <- word8 0x20
-        sz <- decimal
-        return (objectTypeUnmarshall $ BC.unpack h, fromIntegral sz, Nothing)
+        sz <- P.decimal
+        return (objectTypeUnmarshall h, fromIntegral sz, Nothing)
 
-parseTreeHeader   = string "tree " >> decimal >> word8 0
-parseTagHeader    = string "tag " >> decimal >> word8 0
-parseCommitHeader = string "commit " >> decimal >> word8 0
-parseBlobHeader   = string "blob " >> decimal >> word8 0
+parseTreeHeader   = P.string "tree " >> P.decimal >> word8 0
+parseTagHeader    = P.string "tag " >> P.decimal >> word8 0
+parseCommitHeader = P.string "commit " >> P.decimal >> word8 0
+parseBlobHeader   = P.string "blob " >> P.decimal >> word8 0
 
 parseTree   = parseTreeHeader >> objectParseTree
 parseTag    = parseTagHeader >> objectParseTag
@@ -80,7 +77,7 @@ parseBlob   = parseBlobHeader >> objectParseBlob
 
 parseObject :: L.ByteString -> Object
 parseObject = parseSuccess (parseTree <|> parseBlob <|> parseCommit <|> parseTag)
-        where parseSuccess p = either error id . eitherResult . parse p
+        where parseSuccess p = either error id . P.eitherParseChunks  p
 
 -- | unmarshall an object (with header) from a bytestring.
 looseUnmarshall :: L.ByteString -> Object
@@ -110,7 +107,7 @@ looseReadRaw repoPath ref = looseUnmarshallZippedRaw <$> readZippedFile (objectP
 
 -- | read only the header of a loose object.
 looseReadHeader repoPath ref = toHeader <$> readZippedFile (objectPathOfRef repoPath ref)
-        where toHeader = either error id . eitherResult . parse parseHeader . dezip
+        where toHeader = either error id . P.eitherParseChunks parseHeader . dezip
 
 -- | read a specific ref from a loose object and returns an object
 looseRead repoPath ref = looseUnmarshallZipped <$> readZippedFile (objectPathOfRef repoPath ref)
