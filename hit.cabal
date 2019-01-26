@@ -22,7 +22,6 @@ Build-Type:          Simple
 Homepage:            https://github.com/vincenthz/hit
 Cabal-Version:       >=1.8
 data-files:          README.md
-extra-source-files:  Tests/*.hs
 
 Flag debug
   Description:       Add some debugging options
