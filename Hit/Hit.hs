@@ -1,4 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeApplications #-}
 -- |
 -- Module      : Hit
 -- License     : BSD-style
@@ -31,11 +34,11 @@ import qualified Data.Map as M
 import qualified Data.HashTable.IO as H
 import qualified Data.Hashable as Hashable
 
-import Data.Algorithm.Patience as AP (Item(..))
+import Data.Git.Diff.Patience as AP (Item(..))
 
 type HashTable k v = H.CuckooHashTable k v
 
-instance Hashable.Hashable Ref where
+instance Hashable.Hashable (Ref SHA1) where
     hashWithSalt salt = Hashable.hashWithSalt salt . toBinary
 
 verifyPack pref git = do
@@ -76,7 +79,7 @@ verifyPack pref git = do
             modifyIORef leftParsed (\i -> i-1)
             setObj_ refs offsets tree x
 
-        dumpTree :: HashTable Word64 Ref -> HashTable Ref (PackedObjectInfo, Maybe (ObjectPtr, Int)) -> M.Map Ref () -> IO ()
+        dumpTree :: HashTable Word64 (Ref SHA1) -> HashTable (Ref SHA1) (PackedObjectInfo SHA1, Maybe (ObjectPtr SHA1, Int)) -> M.Map (Ref SHA1) () -> IO ()
         dumpTree offsets tree refs = do
             forM_ (M.toAscList refs) $ \(ref, ()) -> do
                 ent <- fromJust <$> H.lookup tree ref
@@ -165,13 +168,14 @@ getLog revision git = do
             return ()
           where author = commitAuthor commit
 
+showDiff :: Revision -> Revision -> Git SHA1 -> IO ()
 showDiff rev1 rev2 git = do
     ref1 <- maybe (error "revision cannot be found") id <$> resolveRevision git rev1
     ref2 <- maybe (error "revision cannot be found") id <$> resolveRevision git rev2
     diffList <- getDiffWith (defaultDiff 5) ([]) ref1 ref2 git
     mapM_ showADiff diffList
     where
-        showADiff :: HitDiff -> IO ()
+        showADiff :: GitDiff SHA1 -> IO ()
         showADiff hd = do
             printFileName $ hFileName hd
             printFileMode $ hFileMode hd
@@ -181,20 +185,20 @@ showDiff rev1 rev2 git = do
         printFileName :: EntPath -> IO ()
         printFileName filename = putStrLn $ "Hit.Diff on file: " ++ (show filename)
 
-        printFileMode :: HitFileMode -> IO ()
+        printFileMode :: GitFileMode -> IO ()
         printFileMode (NewMode (ModePerm m)) = printf "new file mode: %06o\n" m
         printFileMode (OldMode (ModePerm m)) = printf "old file mode: %06o\n" m
         printFileMode (UnModifiedMode (ModePerm m)) = printf "current file mode: %06o\n" m
         printFileMode (ModifiedMode (ModePerm o) (ModePerm n)) = printf "file mode: %06o -> %06o\n" o n
 
-        printFileRef :: HitFileRef -> IO ()
+        printFileRef :: GitFileRef SHA1 -> IO ()
         printFileRef (NewRef r) = putStrLn $ "+++ new/" ++ (show r)
         printFileRef (OldRef r) = putStrLn $ "--- old/" ++ (show r)
         printFileRef (UnModifiedRef r) = putStrLn $ "=== cur/" ++ (show r)
         printFileRef (ModifiedRef o n) = do putStrLn $ "+++ new/" ++ (show n)
                                             putStrLn $ "--- old/" ++ (show o)
 
-        printFileDiff :: HitFileContent -> IO ()
+        printFileDiff :: GitFileContent -> IO ()
         printFileDiff NewBinaryFile = putStrLn "Binary file created"
         printFileDiff OldBinaryFile = putStrLn "Binary file deleted"
         printFileDiff ModifiedBinaryFile = putStrLn "Binary file modified"
@@ -226,7 +230,7 @@ showRefs git = do
 main = do
     args <- getArgs
     case args of
-        ["verify-pack",ref]  -> withCurrentRepo $ verifyPack (fromHexString ref)
+        ["verify-pack",ref]  -> withCurrentRepo $ verifyPack (fromHexString @SHA1 ref)
         ["cat-file",ty,ref]  -> withCurrentRepo $ catFile ty (fromHexString ref)
         ["ls-tree",rev]      -> withCurrentRepo $ lsTree (fromString rev) ""
         ["ls-tree",rev,path] -> withCurrentRepo $ lsTree (fromString rev) path
