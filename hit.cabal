@@ -1,15 +1,11 @@
 Name:                hit
-Version:             0.6.3
-Synopsis:            Git operations in haskell
+Version:             0.7.0
+Synopsis:            Git like program in haskell
 Description:
     .
-    An haskell implementation of git storage operations, allowing users
-    to manipulate git repositories (read and write).
+    Small haskell executable usable example using the git library
     .
-    This implementation is fully interoperable with the main C implementation.
-    .
-    This is stricly only manipulating the git store (what's inside the .git directory),
-    and doesn't do anything with the index or your working directory files.
+    Library component is available at 'git'
     .
 License:             BSD3
 License-file:        LICENSE
