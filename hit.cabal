@@ -47,29 +47,6 @@ Executable           Hit
                    , hourglass
                    , git >= 0.3.0
 
-Test-Suite test-unit
-  type:              exitcode-stdio-1.0
-  hs-source-dirs:    Tests
-  Main-Is:           Tests.hs
-  Build-depends:     base >= 3 && < 7
-                   , bytestring
-                   , tasty
-                   , tasty-quickcheck
-                   , hourglass
-                   , hit
-
-Test-Suite test-repository
-  type:              exitcode-stdio-1.0
-  hs-source-dirs:    Tests
-  Main-Is:           Repo.hs
-  Build-depends:     base >= 3 && < 7
-                   , bytestring
-                   , tasty
-                   , tasty-quickcheck
-                   , hourglass
-                   , bytedump >= 1.0
-                   , hit
-
 source-repository head
   type: git
   location: https://github.com/vincenthz/hit
