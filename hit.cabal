@@ -30,15 +30,10 @@ Executable           Hit
   if flag(debug)
     ghc-options:     -rtsopts -auto-all -caf-all
   Build-depends:     base >= 4 && < 7
-                   , mtl
                    , containers
                    , hashable >= 1.2
                    , hashtables
                    , bytestring
-                   , attoparsec >= 0.10.1
-                   , parsec     >= 3
-                   , filepath
-                   , directory
                    , hourglass
                    , git >= 0.3.0
 
